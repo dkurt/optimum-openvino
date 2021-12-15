@@ -7,6 +7,12 @@ This project provides multiple APIs to enable different tools:
 * [Neural Network Compression Framework (NNCF)](#nncf)
 * [Post-Training Optimization Tool (POT)](#pot)
 
+## Install
+
+```
+pip install -i https://test.pypi.org/simple/ optimum-openvino
+```
+
 ## OpenVINO Runtime
 
 This module provides an inference API for Hugging Face models. There are options to use models with PyTorch\*, TensorFlow\* pretrained weights or use native OpenVINO IR format (a pair of files `ov_model.xml` and `ov_model.bin`).
