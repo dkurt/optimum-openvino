@@ -13,10 +13,12 @@ from transformers.generation_utils import GenerationMixin
 from transformers.modeling_outputs import QuestionAnsweringModelOutput
 from transformers.utils import logging
 
+from nncf.torch import create_compressed_model
 
 logger = logging.get_logger(__name__)
 
 OV_WEIGHTS_NAME = "ov_model.xml"
+NNCF_PT_STATE_NAME = "nncf_state.bin"
 ie = IECore()
 
 
@@ -111,9 +113,30 @@ class OVPreTrainedModel(GenerationMixin):
         revision = kwargs.pop("revision", None)
         from_pipeline = kwargs.pop("_from_pipeline", None)
         from_auto_class = kwargs.pop("_from_auto", False)
+        nncf_config = kwargs.pop("nncf_config", None)
+        nncf_eval = kwargs.pop("nncf_eval", False)
 
         if from_pt:
+            # In case of pretrained model:
+            # if nncf_config is not None and nncf_eval:
+            #     compression_algo_controller, model = create_compressed_model(model, nncf_config,
+            #                                                                  compression_state=state_dict)
+            #     return compression_algo_controller, model
+
             model = cls._pt_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)
+
+            if nncf_config is not None:
+                compression_state = None
+
+                compression_state_file = os.path.join(pretrained_model_name_or_path, NNCF_PT_STATE_NAME)
+                if os.path.isfile(compression_state_file):
+                    compression_state = torch.load(compression_state_file)
+                else:
+                    compression_state = None
+                compression_algo_controller, model = create_compressed_model(model, nncf_config,
+                                                                            compression_state=compression_state)
+                return compression_algo_controller, model
+
             return load_ov_model_from_pytorch(model)
         elif from_tf:
             model = cls._tf_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)
@@ -190,11 +213,17 @@ class OVPreTrainedModel(GenerationMixin):
     def save_pretrained(
         self,
         save_directory,
+        nncf_compression_state,
         **kwargs,
     ):
         """
         Save model in OpenVINO IR format into a directory
         """
+        if nncf_compression_state is not None:
+            nncf_state_output_file = os.path.join(save_directory, NNCF_PT_STATE_NAME)
+            save_function(nncf_compression_state, nncf_state_output_file)
+            return
+
         if not os.path.exists(save_directory):
             os.makedirs(save_directory)
         self.net.serialize(os.path.join(save_directory, OV_WEIGHTS_NAME))

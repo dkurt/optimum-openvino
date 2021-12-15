@@ -14,9 +14,10 @@ except Exception as error:
 
 
 install_requires = [
-    "transformers",
+    "transformers==4.9.1",
     "torch<1.10",
     "openvino-dev==2021.4.2",
+    "nncf",
 ]
 
 setup(
