@@ -1,3 +1,6 @@
+# Copyright (C) 2018-2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 import re
 from setuptools import find_namespace_packages, setup
 
@@ -11,7 +14,7 @@ except Exception as error:
 
 
 install_requires = [
-    "optimum",
+    "transformers",
     "torch<1.10",
     "openvino-dev==2021.4.2",
 ]

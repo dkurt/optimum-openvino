@@ -3,7 +3,7 @@
 Optimum OpenVINO is an extension for [Optimum](https://github.com/huggingface/optimum) library which brings [Intel OpenVINO](https://github.com/openvinotoolkit/openvino) backend for [Hugging Face Transformers](https://github.com/huggingface/transformers) :hugs:.
 
 This project provides multiple APIs to enable different tools:
-* [OpenVINO Runtime](./#openvino-runtime)
+* [OpenVINO Runtime](#openvino-runtime)
 * [Neural Network Compression Framework (NNCF)](#nncf)
 * [Post-Training Optimization Tool (POT)](#pot)
 
