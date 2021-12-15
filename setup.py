@@ -12,15 +12,14 @@ except Exception as error:
 
 install_requires = [
     "optimum",
+    "torch<1.10",
     "openvino-dev==2021.4.2",
 ]
 
 setup(
     name="optimum-openvino",
     version=__version__,
-    description="Optimum Library is an extension of the Hugging Face Transformers library, providing a framework to "
-    "integrate third-party libraries from Hardware Partners and interface with their specific "
-    "functionality.",
+    description="OpenVINO backend for Optimum Library (Hugging Face Transformers extension)",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     classifiers=[
@@ -30,14 +29,13 @@ setup(
         "Intended Audience :: Education",
         "Intended Audience :: Science/Research",
         "Operating System :: OS Independent",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
     keywords="transformers, quantization, pruning, training, intel, openvino",
-    # url="https://huggingface.co/hardware",
-    # author="HuggingFace Inc. Special Ops Team",
-    # author_email="hardware@huggingface.co",
+    url="https://github.com/dkurt/optimum-openvino",
+    author="Intel Corporation",
+    author_email="openvino_pushbot@intel.com",
     license="Apache",
     packages=find_namespace_packages(include=["optimum.*"]),
     install_requires=install_requires,
