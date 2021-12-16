@@ -1,5 +1,7 @@
-# source: https://github.com/huggingface/transformers/blob/bff1c71e84e392af9625c345f9ea71f7b6d75fb3/src/transformers/trainer.py
+# origin: https://github.com/huggingface/transformers/blob/bff1c71e84e392af9625c345f9ea71f7b6d75fb3/src/transformers/trainer.py
 # patch: https://github.com/openvinotoolkit/nncf/blob/develop/third_party_integration/huggingface_transformers/0001-Modifications-for-NNCF-usage.patch
+# additional changes see at https://github.com/dkurt/optimum-openvino/pull/2
+
 # coding=utf-8
 # Copyright 2020-present the HuggingFace Inc. team.
 #
@@ -33,6 +35,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 from nncf.torch.nncf_network import NNCFNetwork
+from nncf.torch import create_compressed_model
+from optimum.intel.nncf import NNCFAutoConfig
 from tqdm.auto import tqdm
 
 
@@ -190,29 +194,6 @@ if TYPE_CHECKING:
 logger = logging.get_logger(__name__)
 
 
-def get_train_dataloader_for_init(args, train_dataset, data_collator=None):
-    from torch.utils.data import RandomSampler
-    from torch.utils.data import DistributedSampler
-    train_sampler = (
-        RandomSampler(train_dataset)
-        if args.local_rank == -1
-        else DistributedSampler(train_dataset)
-    )
-
-    if data_collator is None:
-        from transformers.data.data_collator import default_data_collator
-        data_collator = default_data_collator
-
-    from torch.utils.data import DataLoader
-    data_loader = DataLoader(
-        train_dataset,
-        batch_size=args.train_batch_size,
-        sampler=train_sampler,
-        collate_fn=data_collator,
-        drop_last=args.dataloader_drop_last,
-    )
-    return data_loader
-
 class Trainer:
     """
     Trainer is a simple but feature-complete training and eval loop for PyTorch, optimized for 🤗 Transformers.
@@ -302,7 +283,7 @@ class Trainer:
         compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
-        compression_ctrl: PTCompressionAlgorithmController = None
+        nncf_config: NNCFAutoConfig = None,
     ):
         if args is None:
             output_dir = "tmp_trainer"
@@ -310,7 +291,18 @@ class Trainer:
             args = TrainingArguments(output_dir=output_dir)
         self.args = args
 
-        self.compression_ctrl = compression_ctrl
+        if nncf_config is not None:
+            nncf_config.auto_register_extra_structs(args, train_dataset, data_collator)
+            # TODO: restore compression state
+            # compression_state_file = os.path.join(model_name_or_path, NNCF_PT_STATE_NAME)
+            # if os.path.isfile(compression_state_file):
+            #     compression_state = torch.load(compression_state_file)
+            # else:
+            compression_state = None
+            self.compression_ctrl, model = create_compressed_model(model, nncf_config,
+                                                                   compression_state=compression_state)
+
+
         # Seed must be set before instantiating the model when using model
         set_seed(self.args.seed)
         self.hp_name = None

@@ -27,6 +27,9 @@ from typing import Optional
 import datasets
 from datasets import load_dataset, load_metric
 
+# Must be imported before transformers
+from optimum.intel.nncf import NNCFAutoConfig
+
 import transformers
 from trainer_qa import QuestionAnsweringTrainer
 from transformers import (
@@ -556,6 +559,7 @@ def main():
         return metric.compute(predictions=p.predictions, references=p.label_ids)
 
     # Initialize our Trainer
+    nncf_config = NNCFAutoConfig.from_json(training_args.nncf_config)
     trainer = QuestionAnsweringTrainer(
         model=model,
         args=training_args,
@@ -566,6 +570,7 @@ def main():
         data_collator=data_collator,
         post_process_function=post_processing_function,
         compute_metrics=compute_metrics,
+        nncf_config=nncf_config,
     )
 
     # Training
