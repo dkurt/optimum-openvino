@@ -47,7 +47,7 @@ from optimum.intel.nncf import NNCFAutoConfig
 2. Initialize a config from `.json` file:
 
 ```python
-nncf_config = NNCFAutoConfig.from_json("nncf_bert_config_squad.json")
+nncf_config = NNCFAutoConfig.from_json(training_args.nncf_config)
 ```
 
 3. Pass a config to `Trainer` object. In example,

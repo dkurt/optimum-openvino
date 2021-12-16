@@ -1,9 +1,13 @@
 import os
+from packaging import version
+from copy import deepcopy
 
 from nncf import NNCFConfig
 from nncf.config.structures import BNAdaptationInitArgs
 from nncf.config.structures import QuantizationRangeInitArgs
 from nncf.torch.initialization import PTInitializingDataLoader
+
+from typing import List
 
 
 def get_train_dataloader_for_init(args, train_dataset, data_collator=None):
@@ -30,6 +34,74 @@ def get_train_dataloader_for_init(args, train_dataset, data_collator=None):
     return data_loader
 
 
+def filter_columns(dataset, keep_columns: List[str], remove_columns: List[str]):
+    import datasets
+    if version.parse(datasets.__version__) < version.parse("1.4.0"):
+        dataset.set_format(
+            type=dataset.format["type"], columns=keep_columns, format_kwargs=dataset.format["format_kwargs"]
+        )
+        return dataset
+    else:
+        return dataset.remove_columns(remove_columns)
+
+
+def get_data_loader_cls(args, train_dataset):
+    dataset_name = train_dataset.info.builder_name
+    task_name = train_dataset.info.config_name
+    if dataset_name == "squad":
+        class SquadInitializingDataloader(PTInitializingDataLoader):
+            def get_inputs(self, dataloader_output):
+                return (), dataloader_output
+        return SquadInitializingDataloader
+    elif dataset_name == "glue":
+        if task_name == "sst2":
+            class SST2InitializingDataLoader(PTInitializingDataLoader):
+                def get_inputs(self, dataloader_output):
+                    return (), {
+                        "labels": dataloader_output["labels"],
+                        "attention_mask": dataloader_output["attention_mask"],
+                        "input_ids": dataloader_output["input_ids"]
+                    }
+            return SST2InitializingDataLoader
+
+        if task_name == "mrpc":
+            class MRPCInitializingDataLoader(PTInitializingDataLoader):
+                def get_inputs(self, dataloader_output):
+                    return (), {
+                        "labels": dataloader_output["labels"],
+                        "attention_mask": dataloader_output["attention_mask"],
+                        "input_ids": dataloader_output["input_ids"],
+                        "token_type_ids": dataloader_output["token_type_ids"]
+                    }
+            return MRPCInitializingDataLoader
+
+        if task_name == "mnli":
+            class MNLIInitializingDataLoader(PTInitializingDataLoader):
+                def get_inputs(self, dataloader_output):
+                    return (), {
+                        "labels": dataloader_output["labels"],
+                        "attention_mask": dataloader_output["attention_mask"],
+                        "input_ids": dataloader_output["input_ids"]
+                    }
+            return MNLIInitializingDataLoader
+    elif dataset_name == "xnli":
+        class KwargBasedInitializingDataloader(PTInitializingDataLoader):
+            def get_inputs(self, dataloader_output):
+                return (), dataloader_output
+        return KwargBasedInitializingDataloader
+    elif dataset_name == "conll2003":
+        class ConllInitializingDataloader(PTInitializingDataLoader):
+            def get_inputs(self, dataloader_output):
+                return (), {
+                    "input_ids": dataloader_output["input_ids"],
+                    "attention_mask": dataloader_output["attention_mask"],
+                    "token_type_ids": dataloader_output["token_type_ids"],
+                }
+        return ConllInitializingDataloader
+
+    raise Exception(f"Unexpected dataset_name: {dataset_name} and task_name: {task_name} combination")
+
+
 class NNCFAutoConfig(NNCFConfig):
     def auto_register_extra_structs(self, args, train_dataset, data_collator):
         if self.get("log_dir") is None:
@@ -37,12 +109,19 @@ class NNCFAutoConfig(NNCFConfig):
         if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
             os.makedirs(self["log_dir"])
         if args.do_train:
+            if train_dataset.info.builder_name == "conll2003":
+                train_dataset = deepcopy(train_dataset)
+                train_dataset = filter_columns(train_dataset,
+                                               keep_columns=['labels', 'input_ids', 'attention_mask',
+                                                            'token_type_ids'],
+                                               remove_columns=['ner_tags', 'pos_tags', 'tokens', 'id',
+                                                               'chunk_tags'])
+
             train_dataloader = get_train_dataloader_for_init(args, train_dataset, data_collator)
-            class SquadInitializingDataloader(PTInitializingDataLoader):
-                def get_inputs(self, dataloader_output):
-                    return (), dataloader_output
+
+            initializing_data_loader_cls = get_data_loader_cls(args, train_dataset)
 
             self.register_extra_structs([
-                QuantizationRangeInitArgs(SquadInitializingDataloader(train_dataloader)),
-                BNAdaptationInitArgs(SquadInitializingDataloader(train_dataloader)),
+                QuantizationRangeInitArgs(initializing_data_loader_cls(train_dataloader)),
+                BNAdaptationInitArgs(initializing_data_loader_cls(train_dataloader)),
             ])
