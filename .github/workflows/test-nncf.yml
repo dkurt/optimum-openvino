@@ -1,0 +1,37 @@
+name: NNCF
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test_nncf:
+    name: "Tests"
+
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Setup Python 3.7
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install .
+
+    - name: Prepare examples
+      working-directory: tests/nncf
+      run: |
+        wget https://raw.githubusercontent.com/huggingface/transformers/refs/tags/v4.9.1/examples/pytorch/token-classification/run_ner.py -P examples/pytorch/token-classification
+        wget https://raw.githubusercontent.com/huggingface/transformers/refs/tags/v4.9.1/examples/pytorch/token-classification/requirements.txt
+        patch -p1 < run_ner.patch
+        python -m pip install -r requirements.txt
+
+    - name: Test NNCF
+      working-directory: tests/nncf
+      run: |
+        python -m unittest

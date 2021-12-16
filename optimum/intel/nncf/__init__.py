@@ -1,8 +1,18 @@
 from .nncf_auto import NNCFAutoConfig
 
+from transformers import (
+    trainer,
+    trainer_callback,
+    training_args,
+    modeling_utils,
+)
+
+import os
+
 __all__ = [
     "NNCFAutoConfig",
 ]
+
 
 # This code patches Transformers methods for NNCF
 # source: https://github.com/openvinotoolkit/nncf/blob/develop/third_party_integration/huggingface_transformers/0001-Modifications-for-NNCF-usage.patch
@@ -24,7 +34,7 @@ def patch_func(func, rules):
 
     # Get function source code
     lines = inspect.getsourcelines(func)
-    lines = [l.rstrip("\n") for l in lines[0]]
+    lines = [line.rstrip("\n") for line in lines[0]]
 
     for rule in rules:
         pattern, new_text, mode = rule
@@ -38,20 +48,11 @@ def patch_func(func, rules):
             lines[idx] = new_text
 
     # Restore newline characters
-    code = "".join([l + "\n" for l in lines])
+    code = "".join([line + "\n" for line in lines])
     code = textwrap.dedent(code)
 
     replace_code_of_module(func, code)
 
-
-from transformers import (
-    trainer,
-    trainer_callback,
-    training_args,
-    modeling_utils,
-)
-
-import os
 
 with open(os.path.join(os.path.dirname(__file__), "..", "nncf", "trainer.py"), "rt") as f:
     code = f.read()
@@ -80,9 +81,6 @@ patch_func(
             """
     nncf_config: str = field(default=None,
                              metadata={"help": "NNCF configuration .json file for compression-enabled training"})
-
-    to_onnx: str = field(default=None,
-                         metadata={"help": "Name of the ONNX model file to export the model to."})
 """,
             ADD_LINES_BEFORE,
         ],

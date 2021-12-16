@@ -54,7 +54,6 @@ from .integrations import (  # isort: split
 
 import numpy as np
 import torch
-from nncf.torch.compression_method_api import PTCompressionAlgorithmController
 from nncf.common.utils.tensorboard import prepare_for_tensorboard
 from packaging import version
 from torch import nn
@@ -1989,6 +1988,16 @@ class Trainer:
 
         # Good practice: save your training arguments together with the trained model
         torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
+
+        path_to_onnx = os.path.join(output_dir, "ov_model.onnx")
+        self.compression_ctrl.export_model(path_to_onnx, input_names=["input_ids", "attention_mask"])
+
+        import subprocess
+
+        subprocess.run(
+            [sys.executable, "-m", "mo", "--input_model", path_to_onnx, "--output_dir", output_dir], check=True
+        )
+        os.remove(path_to_onnx)
 
     def store_flos(self):
         # Storing the number of floating-point operations that went into the model
