@@ -14,7 +14,7 @@ except Exception as error:
 
 
 install_requires = [
-    "transformers==4.9.1",
+    "transformers",
     "torch<1.10",
     "openvino-dev[onnx]",
     "nncf",
@@ -23,7 +23,7 @@ install_requires = [
 setup(
     name="optimum-openvino",
     version=__version__,
-    description="OpenVINO backend for Optimum Library (Hugging Face Transformers extension)",
+    description="Intel OpenVINO backend for Hugging Face Transformers",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     classifiers=[

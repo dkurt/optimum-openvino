@@ -1,6 +1,7 @@
 import sys
 import unittest
 import subprocess
+import json
 
 import numpy as np
 
@@ -23,8 +24,8 @@ class NNCFBertBaseNERTest(unittest.TestCase):
                 "--evaluation_strategy=epoch",
                 "--nncf_config=nncf_bert_config_conll.json",
                 "--num_train_epochs=1",
-                "--max_train_samples=10",
-                "--max_eval_samples=10",
+                "--max_train_samples=1000",
+                "--max_eval_samples=100",
             ],
             check=True,
         )
@@ -36,3 +37,9 @@ class NNCFBertBaseNERTest(unittest.TestCase):
         expected_shape = (1, 128, 9)
         output = model(input_ids, attention_mask=attention_mask)[0]
         self.assertEqual(output.shape, expected_shape)
+
+        with open("bert_base_cased_conll_int8/all_results.json", "rt") as f:
+            logs = json.loads(f.read())
+            self.assertGreaterEqual(logs["eval_accuracy"], 0.937)
+            self.assertGreaterEqual(logs["eval_precision"], 0.66)
+            self.assertGreaterEqual(logs["eval_recall"], 0.66)

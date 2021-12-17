@@ -26,6 +26,6 @@ jobs:
         python -m pip install .
 
     - name: Test OpenVINO backend
-      working-directory: tests
+      working-directory: tests/openvino
       run: |
-        python -m unittest discover -s openvino -p 'test_*.py'
+        python -m unittest
