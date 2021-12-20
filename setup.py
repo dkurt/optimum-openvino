@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import re
+import os
 from setuptools import find_namespace_packages, setup
 
 # Ensure we match the version set in src/optimum/version.py
@@ -19,6 +20,10 @@ install_requires = [
     "openvino-dev[onnx]",
     "nncf",
 ]
+
+# Add patches as data
+folder = "optimum/intel/nncf/patches"
+data = [os.path.join(folder, name) for name in os.listdir(folder)]
 
 setup(
     name="optimum-openvino",
@@ -43,4 +48,5 @@ setup(
     license="Apache",
     packages=find_namespace_packages(include=["optimum.*"]),
     install_requires=install_requires,
+    data_files=[('../../optimum/intel/nncf/patches', data)],
 )
