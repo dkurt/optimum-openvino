@@ -38,4 +38,5 @@ jobs:
     - name: Test NNCF
       working-directory: tests/nncf
       run: |
+        cp ../../optimum/intel/nncf/configs/* .
         python -m unittest

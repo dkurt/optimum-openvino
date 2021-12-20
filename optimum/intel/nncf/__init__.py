@@ -18,8 +18,8 @@ __all__ = [
 ]
 
 
-# This code patches Transformers methods for NNCF
-# source: https://github.com/openvinotoolkit/nncf/blob/develop/third_party_integration/huggingface_transformers/0001-Modifications-for-NNCF-usage.patch
+# This code patches Transformers methods for NNCF. Source:
+# https://github.com/openvinotoolkit/nncf/blob/develop/third_party_integration/huggingface_transformers/0001-Modifications-for-NNCF-usage.patch
 def replace_code_of_module(module, new_source):
     import ast
 

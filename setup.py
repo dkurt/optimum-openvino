@@ -28,7 +28,7 @@ data = [os.path.join(folder, name) for name in os.listdir(folder)]
 setup(
     name="optimum-openvino",
     version=__version__,
-    description="Intel OpenVINO backend for Hugging Face Transformers",
+    description="Intel OpenVINO extension for Hugging Face Transformers",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     classifiers=[
@@ -48,5 +48,5 @@ setup(
     license="Apache",
     packages=find_namespace_packages(include=["optimum.*"]),
     install_requires=install_requires,
-    data_files=[('../../optimum/intel/nncf/patches', data)],
+    data_files=[("../../optimum/intel/nncf/patches", data)],
 )
