@@ -26,4 +26,4 @@ jobs:
     - name: Check code style
       run: |
         black --check .
-        flake8 --max-line-length 119 .
+        flake8 .

@@ -1,0 +1,47 @@
+name: NNCF
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  schedule:
+    - cron: "00 7 * * 6"  # Run every saturday on 7:00 UTC
+
+jobs:
+  test_nncf:
+    name: "Tests"
+
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        transformers-version: [4.9.1, 4.11.0, latest]
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Setup Python 3.7
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ "${{ matrix.transformers-version }}" != "latest" ]; then
+          python -m pip install transformers==${{ matrix.transformers-version }}
+        fi
+        python -m pip install .
+
+    - name: Prepare examples
+      working-directory: tests/nncf
+      run: |
+        ver=$(python -c "import transformers; print(transformers.__version__)")
+        wget https://raw.githubusercontent.com/huggingface/transformers/v${ver}/examples/pytorch/token-classification/run_ner.py -P examples/pytorch/token-classification
+        wget https://raw.githubusercontent.com/huggingface/transformers/v${ver}/examples/pytorch/token-classification/requirements.txt
+        patch -p1 < run_ner.patch
+        python -m pip install -r requirements.txt
+
+    - name: Test NNCF
+      working-directory: tests/nncf
+      run: |
+        cp ../../optimum/intel/nncf/configs/* .
+        python -m unittest

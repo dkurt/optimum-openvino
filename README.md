@@ -1,5 +1,7 @@
 # Optimum OpenVINO
 
+[![OpenVINO Runtime](https://github.com/dkurt/optimum-openvino/actions/workflows/test-openvino.yml/badge.svg?branch=main)](https://github.com/dkurt/optimum-openvino/actions/workflows/test-openvino.yml) [![NNCF](https://github.com/dkurt/optimum-openvino/actions/workflows/test-nncf.yml/badge.svg?branch=main)](https://github.com/dkurt/optimum-openvino/actions/workflows/test-nncf.yml)
+
 Optimum OpenVINO is an extension for [Optimum](https://github.com/huggingface/optimum) library which brings [Intel OpenVINO](https://github.com/openvinotoolkit/openvino) backend for [Hugging Face Transformers](https://github.com/huggingface/transformers) :hugs:.
 
 This project provides multiple APIs to enable different tools:
@@ -34,7 +36,43 @@ model = OVAutoModel.from_pretrained(<name_or_path>)
 
 ## NNCF
 
-TBD
+NNCF is used for model training with applying such features like quantization, pruning. To enable NNCF in you training pipeline do the following steps:
+
+1. Import `NNCFAutoConfig`:
+
+```python
+from optimum.intel.nncf import NNCFAutoConfig
+```
+
+> **NOTE**: `NNCFAutoConfig` must be imported before `transformers` to make magic work
+
+2. Initialize a config from `.json` file:
+
+```python
+nncf_config = NNCFAutoConfig.from_json(training_args.nncf_config)
+```
+
+3. Pass a config to `Trainer` object. In example,
+
+```python
+trainer = QuestionAnsweringTrainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset if training_args.do_train else None,
+    eval_dataset=eval_dataset if training_args.do_eval else None,
+    eval_examples=eval_examples if training_args.do_eval else None,
+    tokenizer=tokenizer,
+    data_collator=data_collator,
+    post_process_function=post_processing_function,
+    compute_metrics=compute_metrics,
+    nncf_config=nncf_config,
+)
+```
+
+Training [examples](https://github.com/huggingface/transformers/tree/master/examples/pytorch) can be found in Transformers library.
+NNCF configs are published in [config](./optimum/intel/nncf/configs) folder. Add `--nncf_config` with a path to corresponding config when train your model. More command line examples [here](https://github.com/openvinotoolkit/nncf/tree/develop/third_party_integration/huggingface_transformers).
+
+`python examples/pytorch/token-classification/run_ner.py --model_name_or_path bert-base-cased --dataset_name conll2003 --output_dir bert_base_cased_conll_int8 --do_train --do_eval --save_strategy epoch --evaluation_strategy epoch --nncf_config nncf_bert_config_conll.json`
 
 ## POT
 

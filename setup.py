@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import re
+import os
 from setuptools import find_namespace_packages, setup
 
 # Ensure we match the version set in src/optimum/version.py
@@ -16,13 +17,18 @@ except Exception as error:
 install_requires = [
     "transformers",
     "torch<1.10",
-    "openvino-dev==2021.4.2",
+    "openvino-dev[onnx]",
+    "nncf",
 ]
+
+# Add patches as data
+folder = "optimum/intel/nncf/patches"
+data = [os.path.join(folder, name) for name in os.listdir(folder)]
 
 setup(
     name="optimum-openvino",
     version=__version__,
-    description="OpenVINO backend for Optimum Library (Hugging Face Transformers extension)",
+    description="Intel OpenVINO extension for Hugging Face Transformers",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     classifiers=[
@@ -42,4 +48,5 @@ setup(
     license="Apache",
     packages=find_namespace_packages(include=["optimum.*"]),
     install_requires=install_requires,
+    data_files=[("../../optimum/intel/nncf/patches", data)],
 )
