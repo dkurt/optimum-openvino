@@ -30,6 +30,12 @@ class NNCFBertBaseNERTest(unittest.TestCase):
             check=True,
         )
 
+        with open("bert_base_cased_conll_int8/all_results.json", "rt") as f:
+            logs = json.loads(f.read())
+            self.assertGreaterEqual(logs["eval_accuracy"], 0.937)
+            self.assertGreaterEqual(logs["eval_precision"], 0.66)
+            self.assertGreaterEqual(logs["eval_recall"], 0.66)
+
         model = OVAutoModel.from_pretrained("bert_base_cased_conll_int8")
         input_ids = np.random.randint(0, 256, [1, 128])
         attention_mask = np.random.randint(0, 2, [1, 128])
@@ -37,9 +43,3 @@ class NNCFBertBaseNERTest(unittest.TestCase):
         expected_shape = (1, 128, 9)
         output = model(input_ids, attention_mask=attention_mask)[0]
         self.assertEqual(output.shape, expected_shape)
-
-        with open("bert_base_cased_conll_int8/all_results.json", "rt") as f:
-            logs = json.loads(f.read())
-            self.assertGreaterEqual(logs["eval_accuracy"], 0.937)
-            self.assertGreaterEqual(logs["eval_precision"], 0.66)
-            self.assertGreaterEqual(logs["eval_recall"], 0.66)

@@ -6,6 +6,8 @@ on:
   push:
     branches: [ main ]
   pull_request:
+  schedule:
+    - cron: "00 7 * * 6"  # Run every saturday on 7:00 UTC
 
 jobs:
   test_openvino:

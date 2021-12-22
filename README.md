@@ -1,5 +1,7 @@
 # Optimum OpenVINO
 
+[![OpenVINO Runtime](https://github.com/dkurt/optimum-openvino/actions/workflows/test-openvino.yml/badge.svg?branch=main)](https://github.com/dkurt/optimum-openvino/actions/workflows/test-openvino.yml) [![NNCF](https://github.com/dkurt/optimum-openvino/actions/workflows/test-nncf.yml/badge.svg?branch=main)](https://github.com/dkurt/optimum-openvino/actions/workflows/test-nncf.yml)
+
 Optimum OpenVINO is an extension for [Optimum](https://github.com/huggingface/optimum) library which brings [Intel OpenVINO](https://github.com/openvinotoolkit/openvino) backend for [Hugging Face Transformers](https://github.com/huggingface/transformers) :hugs:.
 
 This project provides multiple APIs to enable different tools:
