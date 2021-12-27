@@ -31,6 +31,7 @@ jobs:
         if [ "${{ matrix.transformers-version }}" != "latest" ]; then
           python -m pip install transformers==${{ matrix.transformers-version }}
         fi
+        python -m pip install tensorflow
         python -m pip install .
 
     - name: Test OpenVINO backend
