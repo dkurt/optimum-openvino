@@ -12,7 +12,7 @@ This project provides multiple APIs to enable different tools:
 ## Install
 
 ```
-pip install -i https://test.pypi.org/simple/ optimum-openvino
+pip install optimum-openvino
 ```
 
 ## OpenVINO Runtime
@@ -36,7 +36,7 @@ model = OVAutoModel.from_pretrained(<name_or_path>)
 
 ## NNCF
 
-NNCF is used for model training with applying such features like quantization, pruning. To enable NNCF in you training pipeline do the following steps:
+[NNCF](https://github.com/openvinotoolkit/nncf) is used for model training with applying such features like quantization, pruning. To enable NNCF in you training pipeline do the following steps:
 
 1. Import `NNCFAutoConfig`:
 
