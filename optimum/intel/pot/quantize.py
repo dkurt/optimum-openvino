@@ -14,6 +14,8 @@ from addict import Dict
 
 LOGGER = logging.getLogger(__name__)
 
+OV_WEIGHTS_NAME = "ov_model.xml"
+
 class bcolors:
     """
     Just gives us some colors for the text
@@ -56,11 +58,13 @@ class OVAutoQuantizer():
 
     def quantize(self):
         # Generate the OV IR if not already present
-        if os.path.isfile(glob.glob(os.path.join(self.config.model.model_ir_path, '*.xml'))[-1]):
-            self.ir_path = glob.glob(os.path.join(self.config.model.model_ir_path, '*.xml'))[-1]
-            LOGGER.warning(f'Using existing IR {self.ir_path}')
+        if os.path.isdir(self.config.model.model_ir_path):
+            if os.path.isfile(glob.glob(os.path.join(self.config.model.model_ir_path, '*.xml'))[-1]):
+                self.ir_path = glob.glob(os.path.join(self.config.model.model_ir_path, '*.xml'))[-1]
+                LOGGER.warning(f'Using existing IR {self.ir_path}')
         else:
-            pretrained_model.save_pretrained(self.config.model.model_ir_path)
+            self.pretrained_model.save_pretrained(self.config.model.model_ir_path)
+            self.ir_path = glob.glob(os.path.join(self.config.model.model_ir_path, '*.xml'))[-1]
 
         model_config = Dict({"model_name": self.config.model_name, "model": self.ir_path, "weights": self.ir_path.replace(".xml", ".bin")})
 
