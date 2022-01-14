@@ -1,13 +1,11 @@
 model:
   model_ir_path : 'model_ir'
 
-task_type: QuestionAnswering
-
 dataset:
   task: squad
   batch_size : 1
   max_length : 384
-  calib_size: 2
+  calib_size: 50
 
 quantization_algorithm:
   name: 'AccuracyAwareQuantization'

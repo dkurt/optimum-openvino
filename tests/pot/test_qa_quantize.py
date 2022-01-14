@@ -47,14 +47,11 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
         model = OVAutoModelForQuestionAnswering.from_pretrained(
             "bert-large-uncased-whole-word-masking-finetuned-squad", from_pt=True
         )
-
-        int8_model_dir = OVAutoQuantizer(
-            "bert-large-uncased-whole-word-masking-finetuned-squad", model, 'config.yml'
+        
+        int8_model_dir = OVAutoQuantizer(model, 'config.yml'
         ).quantize()
 
-        int8_model = OVAutoModelForQuestionAnswering.from_pretrained(
-            '{}'.format(int8_model_dir)
-        )
+        int8_model = OVAutoModelForQuestionAnswering.from_pretrained(int8_model_dir)
 
         self.check_model(int8_model, tok)
 

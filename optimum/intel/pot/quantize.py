@@ -14,8 +14,6 @@ from addict import Dict
 
 LOGGER = logging.getLogger(__name__)
 
-OV_WEIGHTS_NAME = "ov_model.xml"
-
 class bcolors:
     """
     Just gives us some colors for the text
@@ -29,19 +27,12 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def get_data_loader_cls(config):
-    if config.task_type == "QuestionAnswering":
-        return OVQADataLoader(config)
-
-def get_metric_cls(config):
-    if config.task_type == "QuestionAnswering":
-        return OVQAAccuracyMetric(config)
-
 class OVAutoQuantizer():
-    def __init__(self, model_name: str, pretrained_model, config_path):
+    def __init__(self, pretrained_model, config_path):
         self.config = Dict(self.parse_config(config_path))
-        self.config.model_name = model_name 
         self.pretrained_model =  pretrained_model
+        self.config.model_name = self.pretrained_model.config._name_or_path 
+        self.task_type =  self.pretrained_model.config.architectures[0]
         self.ir_path = None
         self.engine_config = Dict({"device": "CPU"})
         self.algorithms = [Dict(self.config.quantization_algorithm)]
@@ -55,27 +46,49 @@ class OVAutoQuantizer():
         
         return config
 
+    def get_data_loader_cls(self):
+        if "QuestionAnswering" in self.task_type:
+            return OVQADataLoader(self.config)
+        else:
+            raise Exception('The task type {} is currently unsupported'.format(self.task_type))    
+
+    def get_metric_cls(self):
+        if "QuestionAnswering" in self.task_type:
+            return OVQAAccuracyMetric(self.config)
+        else:
+            raise Exception('The task type {} is currently unsupported'.format(self.task_type))    
+    
+    def set_ir_path(self, model_path):
+        if not model_path:
+            raise Exception('Provide a valid path through the config file to save the model IR')
+        
+        # Generate the OV IR if not already present
+        if os.path.isdir(model_path):
+            if os.path.isfile(glob.glob(os.path.join(model_path, '*.xml'))[-1]):
+                self.ir_path = glob.glob(os.path.join(model_path, '*.xml'))[-1]
+                LOGGER.warning('Using existing IR {}'.format(self.ir_path))
+            else:
+                LOGGER.warning('Creating IR in path {}'.format(model_path))
+                self.pretrained_model.save_pretrained(model_path)
+                self.ir_path = glob.glob(os.path.join(model_path, '*.xml'))[-1]
+        else:
+            self.pretrained_model.save_pretrained(model_path)
+            self.ir_path = glob.glob(os.path.join(model_path, '*.xml'))[-1]
 
     def quantize(self):
-        # Generate the OV IR if not already present
-        if os.path.isdir(self.config.model.model_ir_path):
-            if os.path.isfile(glob.glob(os.path.join(self.config.model.model_ir_path, '*.xml'))[-1]):
-                self.ir_path = glob.glob(os.path.join(self.config.model.model_ir_path, '*.xml'))[-1]
-                LOGGER.warning(f'Using existing IR {self.ir_path}')
-        else:
-            self.pretrained_model.save_pretrained(self.config.model.model_ir_path)
-            self.ir_path = glob.glob(os.path.join(self.config.model.model_ir_path, '*.xml'))[-1]
-
+        
+        self.set_ir_path(self.config.model.model_ir_path)
+        
         model_config = Dict({"model_name": self.config.model_name, "model": self.ir_path, "weights": self.ir_path.replace(".xml", ".bin")})
 
         # Step 1: Load the model.
         model = load_model(model_config)
 
         # Step 2: Initialize the data loader.
-        data_loader = get_data_loader_cls(self.config)
+        data_loader = self.get_data_loader_cls()
         
         # Step 3 (Optional. Required for AccuracyAwareQuantization): Initialize the metric.
-        metric = get_metric_cls(self.config)
+        metric = self.get_metric_cls()
 
         # Step 4: Initialize the engine for metric calculation and statistics collection.
         engine = IEEngine(config=self.engine_config,
