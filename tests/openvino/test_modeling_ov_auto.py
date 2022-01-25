@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from transformers import GPT2_PRETRAINED_MODEL_ARCHIVE_LIST, AutoTokenizer
+from transformers import AutoTokenizer
 
 try:
     from transformers.testing_utils import require_tf, require_torch
@@ -74,6 +74,12 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
         self.check_model(model, tok)
 
     def test_from_ir(self):
+        import transformers
+        from packaging import version
+
+        if version.parse(transformers.__version__) < version.parse("4.0.0"):
+            return unittest.skip("Too old version of Transformers to test uploaded IR")
+
         tok = AutoTokenizer.from_pretrained("dkurt/bert-large-uncased-whole-word-masking-squad-int8-0001")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
             "dkurt/bert-large-uncased-whole-word-masking-squad-int8-0001"
@@ -84,7 +90,7 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
 @require_torch
 class GPT2ModelTest(unittest.TestCase):
     def test_model_from_pretrained(self):
-        for model_name in GPT2_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
+        for model_name in ["gpt2"]:
             model = OVAutoModel.from_pretrained(model_name, from_pt=True, use_cache=False)
             self.assertIsNotNone(model)
 
