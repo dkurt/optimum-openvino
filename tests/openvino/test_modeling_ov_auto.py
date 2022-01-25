@@ -6,7 +6,24 @@ import unittest
 import numpy as np
 
 from transformers import GPT2_PRETRAINED_MODEL_ARCHIVE_LIST, AutoTokenizer
-from transformers.testing_utils import require_tf, require_torch
+
+try:
+    from transformers.testing_utils import require_tf, require_torch
+except ImportError:
+    from transformers.file_utils import is_torch_available, is_tf_available
+
+    def require_torch(test_case):
+        if not is_torch_available():
+            return unittest.skip("test requires PyTorch")(test_case)
+        else:
+            return test_case
+
+    def require_tf(test_case):
+        if not is_tf_available():
+            return unittest.skip("test requires TensorFlow")(test_case)
+        else:
+            return test_case
+
 
 from optimum.intel.openvino import (
     OVAutoModel,

@@ -11,12 +11,13 @@ on:
 
 jobs:
   test_openvino:
-    name: "Tests"
-
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        transformers-version: ["transformers[torch,tf]==2.11.0", "transformers[torch,tf]"]
+        transformers-version: [
+          "transformers[torch,tf]==2.11.0",
+          "transformers[torch,tf]",
+        ]
     steps:
     - uses: actions/checkout@v2
 

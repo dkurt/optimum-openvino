@@ -9,12 +9,14 @@ on:
 
 jobs:
   test_nncf:
-    name: "Tests"
-
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        transformers-version: [4.9.1, 4.11.0, latest]
+        transformers-version: [
+          "transformers[torch]==4.9.1",
+          "transformers[torch]==4.11.0",
+          "transformers[torch]",
+        ]
     steps:
     - uses: actions/checkout@v2
 
