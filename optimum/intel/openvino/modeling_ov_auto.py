@@ -3,16 +3,23 @@
 
 from transformers import (
     AutoModel,
-    AutoModelForMaskedLM,
     AutoModelForQuestionAnswering,
     AutoModelForSequenceClassification,
     AutoModelWithLMHead,
     TFAutoModel,
-    TFAutoModelForMaskedLM,
     TFAutoModelForQuestionAnswering,
     TFAutoModelForSequenceClassification,
     TFAutoModelWithLMHead,
 )
+
+try:
+    from transformers import (
+        AutoModelForMaskedLM,
+        TFAutoModelForMaskedLM,
+    )
+except ImportError:
+    from transformers import AutoModelWithLMHead as AutoModelForMaskedLM
+    from transformers import TFAutoModelWithLMHead as TFAutoModelForMaskedLM
 
 from .modeling_ov_utils import OVPreTrainedModel
 

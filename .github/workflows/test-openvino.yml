@@ -11,6 +11,8 @@ on:
 
 jobs:
   test_openvino:
+    name: ""
+
     runs-on: ubuntu-18.04
     strategy:
       matrix:
