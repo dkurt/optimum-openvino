@@ -51,7 +51,7 @@ setup(
     license="Apache",
     packages=find_namespace_packages(include=["optimum.*"]),
     install_requires=install_requires,
-    extras_require= {
+    extras_require={
         "nncf": nncf_deps,
         "all": nncf_deps,
     },
