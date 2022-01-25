@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import logging
 
 import numpy as np
 
 from openvino.inference_engine import IECore
 
 from transformers.file_utils import cached_path, hf_bucket_url
-from transformers.utils import logging
 from transformers.file_utils import is_torch_available
 
 try:
@@ -33,7 +33,7 @@ else:
         end_logits: np.array = None
 
 
-logger = logging.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 OV_WEIGHTS_NAME = "ov_model.xml"
 ie = IECore()
