@@ -19,6 +19,7 @@ install_requires = [
     "torch<1.10",
     "openvino-dev[onnx]",
     "nncf",
+    "datasets",
 ]
 
 # Add patches as data
