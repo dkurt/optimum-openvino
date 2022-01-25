@@ -111,6 +111,7 @@ class OVAlbertModelIntegrationTest(unittest.TestCase):
 
         self.assertTrue(np.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
+
 @require_torch
 class OVOPENAIGPTModelLanguageGenerationTest(unittest.TestCase):
     def test_lm_generate_openai_gpt(self):

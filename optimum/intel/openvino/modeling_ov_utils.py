@@ -7,16 +7,20 @@ import numpy as np
 
 from openvino.inference_engine import IECore
 
-from transformers.file_utils import ModelOutput, cached_path, hf_bucket_url
+from transformers.file_utils import cached_path, hf_bucket_url
 from transformers.utils import logging
+from transformers.file_utils import is_torch_available
 
 try:
+    from transformers.file_utils import ModelOutput
+except ImportError:
+    pass
+
+if is_torch_available():
     import torch
     from transformers.generation_utils import GenerationMixin
     from transformers.modeling_outputs import QuestionAnsweringModelOutput
-
-    torch_available = True
-except ImportError:
+else:
     from dataclasses import dataclass
 
     class GenerationMixin(object):
@@ -27,8 +31,6 @@ except ImportError:
     class QuestionAnsweringModelOutput(ModelOutput):
         start_logits: np.array = None
         end_logits: np.array = None
-
-    torch_available = False
 
 
 logger = logging.get_logger(__name__)
@@ -112,7 +114,7 @@ class OVPreTrainedModel(GenerationMixin):
         self.max_length = 0
         self.ov_config = {}
         self.ov_device = "CPU"
-        if torch_available:
+        if is_torch_available():
             self.device = torch.device("cpu")
 
     @classmethod
@@ -281,7 +283,7 @@ class OVPreTrainedModel(GenerationMixin):
         return result
 
     def generate(self, input_ids, *args, **kwargs):
-        if not torch_available:
+        if not is_torch_available():
             raise Exception("PyTorch is required to run generators")
 
         if not isinstance(input_ids, torch.Tensor):

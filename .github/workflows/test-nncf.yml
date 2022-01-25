@@ -9,7 +9,7 @@ on:
 
 jobs:
   test_nncf:
-    name: ""
+    name: "Tests"
 
     runs-on: ubuntu-18.04
     strategy:
