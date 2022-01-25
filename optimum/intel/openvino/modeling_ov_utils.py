@@ -287,7 +287,7 @@ class OVPreTrainedModel(GenerationMixin):
             logits = logits[:, :inp_length]
 
         if return_dict:
-            result = ModelOutput(logits=logits)
+            result = ModelOutput(logits=torch.tensor(logits))
         elif "output_s" in outs and "output_e" in outs:
             result = QuestionAnsweringModelOutput(start_logits=outs["output_s"], end_logits=outs["output_e"])
         else:

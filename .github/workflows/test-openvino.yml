@@ -18,7 +18,7 @@ jobs:
       matrix:
         transformers-version: [
           "transformers[tf-cpu]==2.11.0",
-          "transformers[torch,tf-cpu]",
+          "transformers[torch,tf-cpu] torch==1.9.1",
         ]
     steps:
     - uses: actions/checkout@v2
