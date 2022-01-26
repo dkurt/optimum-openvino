@@ -16,7 +16,10 @@ except Exception as error:
 
 install_requires = [
     "transformers",
-    "torch<1.10",
+    "openvino",
+]
+
+nncf_deps = [
     "openvino-dev[onnx]",
     "nncf",
 ]
@@ -48,5 +51,9 @@ setup(
     license="Apache",
     packages=find_namespace_packages(include=["optimum.*"]),
     install_requires=install_requires,
+    extras_require={
+        "nncf": nncf_deps,
+        "all": nncf_deps,
+    },
     data_files=[("../../optimum/intel/nncf/patches", data)],
 )

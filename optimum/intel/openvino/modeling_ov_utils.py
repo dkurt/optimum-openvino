@@ -2,19 +2,32 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import logging
 
 import numpy as np
-import torch
 
 from openvino.inference_engine import IECore
 
-from transformers.file_utils import ModelOutput, cached_path, hf_bucket_url
-from transformers.generation_utils import GenerationMixin
-from transformers.modeling_outputs import QuestionAnsweringModelOutput
-from transformers.utils import logging
+from transformers.file_utils import cached_path, hf_bucket_url
+from transformers.file_utils import is_torch_available
 
 
-logger = logging.get_logger(__name__)
+if is_torch_available():
+    import torch
+    from transformers.generation_utils import GenerationMixin
+    from transformers.file_utils import ModelOutput
+    from transformers.modeling_outputs import QuestionAnsweringModelOutput
+else:
+    from collections import namedtuple
+
+    class GenerationMixin(object):
+        def __init__(self):
+            pass
+
+    QuestionAnsweringModelOutput = namedtuple("QuestionAnsweringModelOutput", ["start_logits", "end_logits"])
+    ModelOutput = namedtuple("ModelOutput", ["logits"])
+
+logger = logging.getLogger(__name__)
 
 OV_WEIGHTS_NAME = "ov_model.xml"
 ie = IECore()
@@ -52,13 +65,28 @@ def load_ov_model_from_tf(model):
     import subprocess
     import sys
 
-    model.save("keras_model", signatures=model.serving)
+    import tensorflow as tf
+    from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
+
+    func = tf.function(lambda input_ids, attention_mask: model(input_ids, attention_mask=attention_mask))
+    func = func.get_concrete_function(
+        input_ids=tf.TensorSpec((None, None), tf.int32, name="input_ids"),
+        attention_mask=tf.TensorSpec((None, None), tf.int32, name="attention_mask"),
+    )
+    frozen_func = convert_variables_to_constants_v2(func)
+    graph_def = frozen_func.graph.as_graph_def()
+
+    pb_model_path = "frozen_graph.pb"
+    with tf.io.gfile.GFile(pb_model_path, "wb") as f:
+        f.write(graph_def.SerializeToString())
+
     subprocess.run(
         [
             sys.executable,
             "-m",
             "mo",
-            "--saved_model_dir=keras_model",
+            "--input_model",
+            pb_model_path,
             "--model_name=model",
             "--input",
             "input_ids,attention_mask",
@@ -68,6 +96,12 @@ def load_ov_model_from_tf(model):
         ],
         check=True,
     )
+
+    try:
+        os.remove(pb_model_path)
+    except Exception:
+        pass
+
     net = ie.read_network("model.xml")
     return OVPreTrainedModel(net, model.config)
 
@@ -95,7 +129,8 @@ class OVPreTrainedModel(GenerationMixin):
         self.max_length = 0
         self.ov_config = {}
         self.ov_device = "CPU"
-        self.device = torch.device("cpu")
+        if is_torch_available():
+            self.device = torch.device("cpu")
 
     @classmethod
     def from_pretrained(cls, model_name_or_path, *model_args, **kwargs):
@@ -252,17 +287,17 @@ class OVPreTrainedModel(GenerationMixin):
             logits = logits[:, :inp_length]
 
         if return_dict:
-            result = ModelOutput()
-            result["logits"] = torch.tensor(logits)
+            result = ModelOutput(logits=torch.tensor(logits))
         elif "output_s" in outs and "output_e" in outs:
-            result = QuestionAnsweringModelOutput()
-            result["start_logits"] = outs["output_s"]
-            result["end_logits"] = outs["output_e"]
+            result = QuestionAnsweringModelOutput(start_logits=outs["output_s"], end_logits=outs["output_e"])
         else:
             result = [logits]
         return result
 
     def generate(self, input_ids, *args, **kwargs):
+        if not is_torch_available():
+            raise Exception("PyTorch is required to run generators")
+
         if not isinstance(input_ids, torch.Tensor):
             input_ids = torch.tensor(input_ids)
 

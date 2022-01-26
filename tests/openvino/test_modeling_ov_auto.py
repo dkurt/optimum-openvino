@@ -5,8 +5,25 @@ import unittest
 
 import numpy as np
 
-from transformers import GPT2_PRETRAINED_MODEL_ARCHIVE_LIST, AutoTokenizer
-from transformers.testing_utils import require_tf
+from transformers import AutoTokenizer
+
+try:
+    from transformers.testing_utils import require_tf, require_torch
+except ImportError:
+    from transformers.file_utils import is_torch_available, is_tf_available
+
+    def require_torch(test_case):
+        if not is_torch_available():
+            return unittest.skip("test requires PyTorch")(test_case)
+        else:
+            return test_case
+
+    def require_tf(test_case):
+        if not is_tf_available():
+            return unittest.skip("test requires TensorFlow")(test_case)
+        else:
+            return test_case
+
 
 from optimum.intel.openvino import (
     OVAutoModel,
@@ -35,7 +52,7 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
         # For better OpenVINO efficiency it's recommended to use fixed input shape.
         # So pad input_ids up to specific max_length.
         input_ids = tok.encode(
-            question + " " + tok.sep_token + " " + context, return_tensors="pt", max_length=128, padding="max_length"
+            question + " " + tok.sep_token + " " + context, return_tensors="np", max_length=128, padding="max_length"
         )
 
         outputs = model(input_ids)
@@ -48,6 +65,7 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
 
         self.assertEqual(answer, "the garden")
 
+    @require_torch
     def test_from_pt(self):
         tok = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
@@ -56,6 +74,12 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
         self.check_model(model, tok)
 
     def test_from_ir(self):
+        import transformers
+        from packaging import version
+
+        if version.parse(transformers.__version__) < version.parse("4.0.0"):
+            return unittest.skip("Too old version of Transformers to test uploaded IR")
+
         tok = AutoTokenizer.from_pretrained("dkurt/bert-large-uncased-whole-word-masking-squad-int8-0001")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
             "dkurt/bert-large-uncased-whole-word-masking-squad-int8-0001"
@@ -63,9 +87,10 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
         self.check_model(model, tok)
 
 
+@require_torch
 class GPT2ModelTest(unittest.TestCase):
     def test_model_from_pretrained(self):
-        for model_name in GPT2_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
+        for model_name in ["gpt2"]:
             model = OVAutoModel.from_pretrained(model_name, from_pt=True, use_cache=False)
             self.assertIsNotNone(model)
 
@@ -77,6 +102,7 @@ class GPT2ModelTest(unittest.TestCase):
             self.assertEqual(output.shape, expected_shape)
 
 
+@require_torch
 class OVAlbertModelIntegrationTest(unittest.TestCase):
     def test_inference_no_head_absolute_embedding(self):
         model = OVAutoModel.from_pretrained("albert-base-v2", from_pt=True)
@@ -92,6 +118,7 @@ class OVAlbertModelIntegrationTest(unittest.TestCase):
         self.assertTrue(np.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
+@require_torch
 class OVOPENAIGPTModelLanguageGenerationTest(unittest.TestCase):
     def test_lm_generate_openai_gpt(self):
         model = OVAutoModelWithLMHead.from_pretrained("openai-gpt", from_pt=True)
@@ -123,6 +150,7 @@ class OVOPENAIGPTModelLanguageGenerationTest(unittest.TestCase):
         self.assertListEqual(output_ids[0].tolist(), expected_output_ids)
 
 
+@require_torch
 class RobertaModelIntegrationTest(unittest.TestCase):
     def test_inference_masked_lm(self):
         model = OVAutoModelForMaskedLM.from_pretrained("roberta-base", from_pt=True)
@@ -203,6 +231,7 @@ class OVTFDistilBertModelIntegrationTest(unittest.TestCase):
         self.assertTrue(np.allclose(output[:, :3, :3], expected_slice, atol=1e-4))
 
 
+@require_torch
 class OVDistilBertModelIntegrationTest(unittest.TestCase):
     def test_inference_no_head_absolute_embedding(self):
         model = OVAutoModel.from_pretrained("distilbert-base-uncased", from_pt=True)
