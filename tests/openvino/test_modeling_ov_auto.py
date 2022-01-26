@@ -183,6 +183,35 @@ class RobertaModelIntegrationTest(unittest.TestCase):
 
         self.assertTrue(np.allclose(output[:, :3, :3], expected_slice, atol=1e-4))
 
+    def test_inference_batch(self):
+        model = OVAutoModel.from_pretrained("roberta-base", from_pt=True)
+        tok = AutoTokenizer.from_pretrained("roberta-base")
+
+        inputs = ["Good evening.", "here is the sentence I want embeddings for."]
+        input_ids = np.concatenate(
+            [tok.encode(inp, return_tensors="np", max_length=16, padding="max_length") for inp in inputs]
+        )
+
+        output = model(input_ids)[0]
+
+        # compare the actual values for a slice.
+        expected_slice = np.array(
+            [
+                [
+                    [-0.09037264, 0.10670696, -0.06938689],
+                    [-0.10737953, 0.20106763, 0.04490039],
+                    [0.0991028, 0.18117547, 0.0122529],
+                ],
+                [
+                    [-0.09360617, 0.11848789, -0.03424963],
+                    [0.1246291, -0.3622079, -0.02089296],
+                    [0.36143878, 0.27680993, 0.28920814],
+                ],
+            ]
+        )
+
+        self.assertTrue(np.allclose(output[:, :3, :3], expected_slice, atol=1e-4))
+
 
 @require_tf
 class TFRobertaModelIntegrationTest(unittest.TestCase):
