@@ -265,7 +265,7 @@ class OVPreTrainedModel(GenerationMixin):
     def _load_network(self):
         self.exec_net = ie.load_network(self.net, self.ov_device, self.ov_config)
 
-    def _process_data(self, ids: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    def _process_data(self, ids: np.ndarray, mask: np.ndarray):
         # In case of batching, we process samples one by one instead of
         # single forward pass. It is done because of heavy load_network step.
         batch_size = ids.shape[0]
@@ -273,17 +273,18 @@ class OVPreTrainedModel(GenerationMixin):
             outs = {k: np.zeros([batch_size] + out.shape[1:], np.float32) for k, out in self.net.outputs.items()}
             for i in range(batch_size):
                 outs_i = self.exec_net.infer(
-                    {"input_ids": ids[i : i + 1], "attention_mask": mask[i : i + 1],}
+                    {
+                        "input_ids": ids[i : i + 1],
+                        "attention_mask": mask[i : i + 1],
+                    }
                 )
                 for name in outs:
-                    outs[name][i] = out_i[name]
+                    # OpenVINO produces redundant output for Stack layers. Ignore them
+                    if name.endswith("/stack"):
+                        continue
+                    outs[name][i] = outs_i[name]
         else:
-            outs = self.exec_net.infer(
-                {
-                    "input_ids": ids,
-                    "attention_mask": mask
-                }
-            )
+            outs = self.exec_net.infer({"input_ids": ids, "attention_mask": mask})
         return outs
 
     def __call__(
