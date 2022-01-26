@@ -124,9 +124,9 @@ def load_ov_model_from_ir(xml_path, bin_path):
     return OVPreTrainedModel(net)
 
 
-def load_model_from_cache(model_name_or_path, cache_dir, filename):
+def load_model_from_cache(model_name_or_path, model_arch, cache_dir, filename):
     url = hf_bucket_url(model_name_or_path, filename=filename)
-    path = cached_path(url, cache_dir=cache_dir)
+    path = cached_path(url, cache_dir=cache_dir) + "." + model_arch
     xml_path = path + ".xml"
     bin_path = path + ".bin"
     model = None
@@ -170,7 +170,7 @@ class OVPreTrainedModel(GenerationMixin):
             model = cls._pt_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)
             return load_ov_model_from_pytorch(model)
         elif from_tf:
-            model, cache_path = load_model_from_cache(model_name_or_path, cache_dir, TF2_WEIGHTS_NAME)
+            model, cache_path = load_model_from_cache(model_name_or_path, cls.__name__, cache_dir, TF2_WEIGHTS_NAME)
             if model is not None:
                 return model
             model = cls._tf_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)
@@ -265,6 +265,27 @@ class OVPreTrainedModel(GenerationMixin):
     def _load_network(self):
         self.exec_net = ie.load_network(self.net, self.ov_device, self.ov_config)
 
+    def _process_data(self, ids: np.ndarray, mask: np.ndarray) -> np.ndarray:
+        # In case of batching, we process samples one by one instead of
+        # single forward pass. It is done because of heavy load_network step.
+        batch_size = ids.shape[0]
+        if batch_size > 1:
+            outs = {k: np.zeros([batch_size] + out.shape[1:], np.float32) for k, out in self.net.outputs.items()}
+            for i in range(batch_size):
+                outs_i = self.exec_net.infer(
+                    {"input_ids": ids[i : i + 1], "attention_mask": mask[i : i + 1],}
+                )
+                for name in outs:
+                    outs[name][i] = out_i[name]
+        else:
+            outs = self.exec_net.infer(
+                {
+                    "input_ids": ids,
+                    "attention_mask": mask
+                }
+            )
+        return outs
+
     def __call__(
         self,
         input_ids=None,
@@ -281,26 +302,24 @@ class OVPreTrainedModel(GenerationMixin):
             attention_mask = np.ones_like(input_ids)
 
         batch_size, inp_length = input_ids.shape
+        # If <max_length> specified, pad inputs by zeros
         if inp_length < self.max_length:
             pad = ((0, 0), (0, self.max_length - inp_length))
             input_ids = np.pad(input_ids, pad)
             attention_mask = np.pad(attention_mask, pad)
 
         inputs_info = self.net.input_info
-        if list(inputs_info["input_ids"].input_data.shape) != list(input_ids.shape):
-            shapes = {key: input_ids.shape for key in inputs_info}
+        if inputs_info["input_ids"].input_data.shape[1] != input_ids.shape[1]:
+            # Use batch size 1 because we process batch sequently.
+            shapes = {key: [1, input_ids.shape[1]] for key in inputs_info}
+            logger.info(f"Reshape model to 1x{input_ids.shape[1]}")
             self.net.reshape(shapes)
             self.exec_net = None
 
         if self.exec_net is None:
             self._load_network()
 
-        outs = self.exec_net.infer(
-            {
-                "input_ids": input_ids,
-                "attention_mask": attention_mask,
-            }
-        )
+        outs = self._process_data(input_ids, attention_mask)
 
         logits = outs["output"] if "output" in outs else next(iter(outs.values()))
 
