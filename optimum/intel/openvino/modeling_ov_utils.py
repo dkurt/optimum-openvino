@@ -10,6 +10,9 @@ from openvino.inference_engine import IECore
 
 from transformers.file_utils import cached_path, hf_bucket_url
 from transformers.file_utils import is_torch_available
+from transformers import (
+    TF2_WEIGHTS_NAME,
+)
 
 
 if is_torch_available():
@@ -61,7 +64,7 @@ def load_ov_model_from_pytorch(model):
     return OVPreTrainedModel(net, model.config)
 
 
-def load_ov_model_from_tf(model):
+def load_ov_model_from_tf(model, tf_weights_path):
     import subprocess
     import sys
 
@@ -76,7 +79,8 @@ def load_ov_model_from_tf(model):
     frozen_func = convert_variables_to_constants_v2(func)
     graph_def = frozen_func.graph.as_graph_def()
 
-    pb_model_path = "frozen_graph.pb"
+    cache_dir = os.path.dirname(tf_weights_path)
+    pb_model_path = os.path.join(cache_dir, "frozen_graph.pb")
     with tf.io.gfile.GFile(pb_model_path, "wb") as f:
         f.write(graph_def.SerializeToString())
 
@@ -85,9 +89,12 @@ def load_ov_model_from_tf(model):
             sys.executable,
             "-m",
             "mo",
+            "--output_dir",
+            cache_dir,
             "--input_model",
             pb_model_path,
-            "--model_name=model",
+            "--model_name",
+            os.path.basename(tf_weights_path),
             "--input",
             "input_ids,attention_mask",
             "--input_shape",
@@ -102,7 +109,7 @@ def load_ov_model_from_tf(model):
     except Exception:
         pass
 
-    net = ie.read_network("model.xml")
+    net = ie.read_network(tf_weights_path + ".xml")
     return OVPreTrainedModel(net, model.config)
 
 
@@ -115,6 +122,18 @@ def load_ov_model_from_ir(xml_path, bin_path):
 
     net = ie.read_network(xml_path, bin_path)
     return OVPreTrainedModel(net)
+
+
+def load_model_from_cache(model_name_or_path, cache_dir, filename):
+    url = hf_bucket_url(model_name_or_path, filename=filename)
+    path = cached_path(url, cache_dir=cache_dir)
+    xml_path = path + ".xml"
+    bin_path = path + ".bin"
+    model = None
+    if os.path.exists(xml_path) and os.path.exists(bin_path):
+        logger.info(f"Load OpenVINO model from cache: {xml_path}")
+        model = load_ov_model_from_ir(xml_path, bin_path)
+    return model, path
 
 
 class OVPreTrainedModel(GenerationMixin):
@@ -151,8 +170,11 @@ class OVPreTrainedModel(GenerationMixin):
             model = cls._pt_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)
             return load_ov_model_from_pytorch(model)
         elif from_tf:
+            model, cache_path = load_model_from_cache(model_name_or_path, cache_dir, TF2_WEIGHTS_NAME)
+            if model is not None:
+                return model
             model = cls._tf_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)
-            return load_ov_model_from_tf(model)
+            return load_ov_model_from_tf(model, cache_path)
 
         user_agent = {"file_type": "model", "framework": "openvino", "from_auto_class": from_auto_class}
         if from_pipeline is not None:
