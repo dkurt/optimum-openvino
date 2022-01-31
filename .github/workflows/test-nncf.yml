@@ -39,7 +39,6 @@ jobs:
         ver=$(python -c "import transformers; print(transformers.__version__)")
         wget https://raw.githubusercontent.com/huggingface/transformers/v${ver}/examples/pytorch/token-classification/run_ner.py -P examples/pytorch/token-classification
         wget https://raw.githubusercontent.com/huggingface/transformers/v${ver}/examples/pytorch/token-classification/requirements.txt
-        patch -p1 < run_ner.patch
         python -m pip install -r requirements.txt
 
     - name: Test NNCF
