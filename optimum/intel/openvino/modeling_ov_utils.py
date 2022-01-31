@@ -148,6 +148,7 @@ class OVPreTrainedModel(GenerationMixin):
         self.max_length = 0
         self.ov_config = {}
         self.ov_device = "CPU"
+        self.main_input_name = "input_ids"  # Fix for transformers>=4.16.0
         if is_torch_available():
             self.device = torch.device("cpu")
 
