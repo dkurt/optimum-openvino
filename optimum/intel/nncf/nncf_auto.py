@@ -110,8 +110,18 @@ def get_data_loader_cls(args, train_dataset):
                 }
 
         return ConllInitializingDataloader
+    elif dataset_name == "superb":
 
-    raise Exception(f"Unexpected dataset_name: {dataset_name} and task_name: {task_name} combination")
+        class SuperbDataloader(PTInitializingDataLoader):
+            def get_inputs(self, dataloader_output):
+                return (), {
+                    "input_values": dataloader_output["input_values"],
+                    "labels": dataloader_output["labels"],
+                }
+
+        return SuperbDataloader
+
+    raise Exception(f"Unexpected dataset_name: {dataset_name} and task_name: {task_name}")
 
 
 class NNCFAutoConfig(NNCFConfig):
