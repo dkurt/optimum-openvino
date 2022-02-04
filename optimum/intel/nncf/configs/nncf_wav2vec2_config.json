@@ -24,13 +24,13 @@
         },
         "activations":
         {
-            "mode": "symmetric"
+            "mode": "asymmetric"
         },
         "weights":
         {
             "mode": "symmetric",
             "signed": true,
-            "per_channel": false
+            "per_channel": true
         }
     }
 }

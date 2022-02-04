@@ -1,10 +1,15 @@
 # Quantize Wav2Vec2
 
-This guide demonstrates how to quantize a pre-trained `Wav2Vec2` model for audio classification.
+This guide demonstrates how to quantize a pre-trained `Wav2Vec2` model for audio classification. We also publihed ready to use quantized models:
+
+| Dataset | Pretrained Model | # transformer layers | Accuracy on eval (baseline) | Accuracy on eval (quantized) | Download |
+|---------|------------------|----------------------|-----------------------------|----------------------------------------|----------|
+| Keyword Spotting | [facebook/wav2vec2-base](https://huggingface.co/facebook/wav2vec2-base) | 12 | 0.9828 | 0.9553 (-0.0274) | [here](https://huggingface.co/dkurt/wav2vec2-base-ft-keyword-spotting-int8) |
+
 
 1. Download an example source code from https://github.com/huggingface/transformers/tree/v4.15.0/examples/pytorch/audio-classification. Install necessary requirements.
 
-2. Apply the following patch to enable NNCF compression:
+2. [Install](../README.md#NNCF) Optimum OpenVINO and apply the following patch to enable NNCF compression:
 
 ```patch
 --- a/examples/pytorch/audio-classification/run_audio_classification.py
@@ -44,8 +49,7 @@ This guide demonstrates how to quantize a pre-trained `Wav2Vec2` model for audio
      )
 ```
 
-3. Run training process. The command uses [pre-trained](https://huggingface.co/anton-l/wav2vec2-base-ft-keyword-spotting) model with baseline eval accuracy `0.9828` With a [config](../optimum/intel/nncf/configs/nncf_wav2vec2_config.json) you will achieve `???` eval accuracy for quantized model.
-
+3. Run training process from pre-trained model and [NNCF config](../optimum/intel/nncf/configs/nncf_wav2vec2_config.json):
 
 ```bash
 python run_audio_classification.py \
@@ -69,9 +73,8 @@ python run_audio_classification.py \
     --dataloader_num_workers 4 \
     --logging_strategy steps \
     --logging_steps 10 \
-    --max_train_samples=1000 \
     --evaluation_strategy epoch \
-    --save_strategy epoch \
+    --save_strategy epoch \]
     --load_best_model_at_end True \
     --metric_for_best_model accuracy \
     --save_total_limit 3 \
