@@ -66,7 +66,6 @@ def load_ov_model_from_pytorch(model):
 
 def load_ov_model_from_tf(model, tf_weights_path):
     import subprocess
-    import sys
 
     import tensorflow as tf
     from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
@@ -86,8 +85,6 @@ def load_ov_model_from_tf(model, tf_weights_path):
 
     subprocess.run(
         [
-            sys.executable,
-            "-m",
             "mo",
             "--output_dir",
             cache_dir,

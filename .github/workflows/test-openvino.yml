@@ -20,6 +20,10 @@ jobs:
           "transformers[tf-cpu]==2.11.0",
           "transformers[torch,tf-cpu] torch==1.9.1",
         ]
+        openvino-version: [
+          "openvino-dev~=2021.4.2",
+          "openvino-dev~=2022.1.0.dev",
+        ]
     steps:
     - uses: actions/checkout@v2
 
@@ -31,8 +35,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        python -m pip install .
+        python -m pip install ${{ matrix.openvino-version }}
         python -m pip install ${{ matrix.transformers-version }} tensorflow-cpu==2.7.0
-        python -m pip install .[all]
 
     - name: Test OpenVINO backend
       working-directory: tests/openvino
