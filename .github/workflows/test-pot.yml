@@ -27,7 +27,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ "${{ matrix.transformers-version }}" != "latest" ]; then
-          python -m pip install transformers==${{ matrix.transformers-version }}
+          python -m pip install transformers==${{ matrix.transformers-version }} torch==1.9.1
         fi
         python -m pip install .
 
