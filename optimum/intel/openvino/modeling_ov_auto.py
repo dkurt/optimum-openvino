@@ -1,18 +1,35 @@
 # Copyright (C) 2018-2021 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-from transformers import (
-    AutoModel,
-    AutoModelForMaskedLM,
-    AutoModelForQuestionAnswering,
-    AutoModelForSequenceClassification,
-    AutoModelWithLMHead,
-    TFAutoModel,
-    TFAutoModelForMaskedLM,
-    TFAutoModelForQuestionAnswering,
-    TFAutoModelForSequenceClassification,
-    TFAutoModelWithLMHead,
-)
+from transformers.file_utils import is_torch_available, is_tf_available
+
+
+if is_torch_available():
+    from transformers import (
+        AutoModel,
+        AutoModelForQuestionAnswering,
+        AutoModelForSequenceClassification,
+        AutoModelWithLMHead,
+    )
+
+    try:
+        from transformers import AutoModelForMaskedLM
+    except ImportError:
+        from transformers import AutoModelWithLMHead as AutoModelForMaskedLM
+
+if is_tf_available():
+    from transformers import (
+        TFAutoModel,
+        TFAutoModelForQuestionAnswering,
+        TFAutoModelForSequenceClassification,
+        TFAutoModelWithLMHead,
+    )
+
+    try:
+        from transformers import TFAutoModelForMaskedLM
+    except ImportError:
+        from transformers import TFAutoModelWithLMHead as TFAutoModelForMaskedLM
+
 
 from .modeling_ov_utils import OVPreTrainedModel
 
@@ -26,25 +43,35 @@ class _BaseOVAutoModelClass(OVPreTrainedModel):
 
 
 class OVAutoModel(_BaseOVAutoModelClass):
-    _pt_auto_model = AutoModel
-    _tf_auto_model = TFAutoModel
+    if is_torch_available():
+        _pt_auto_model = AutoModel
+    if is_tf_available():
+        _tf_auto_model = TFAutoModel
 
 
 class OVAutoModelForMaskedLM(_BaseOVAutoModelClass):
-    _pt_auto_model = AutoModelForMaskedLM
-    _tf_auto_model = TFAutoModelForMaskedLM
+    if is_torch_available():
+        _pt_auto_model = AutoModelForMaskedLM
+    if is_tf_available():
+        _tf_auto_model = TFAutoModelForMaskedLM
 
 
 class OVAutoModelWithLMHead(_BaseOVAutoModelClass):
-    _pt_auto_model = AutoModelWithLMHead
-    _tf_auto_model = TFAutoModelWithLMHead
+    if is_torch_available():
+        _pt_auto_model = AutoModelWithLMHead
+    if is_tf_available():
+        _tf_auto_model = TFAutoModelWithLMHead
 
 
 class OVAutoModelForQuestionAnswering(_BaseOVAutoModelClass):
-    _pt_auto_model = AutoModelForQuestionAnswering
-    _tf_auto_model = TFAutoModelForQuestionAnswering
+    if is_torch_available():
+        _pt_auto_model = AutoModelForQuestionAnswering
+    if is_tf_available():
+        _tf_auto_model = TFAutoModelForQuestionAnswering
 
 
 class OVAutoModelForSequenceClassification(_BaseOVAutoModelClass):
-    _pt_auto_model = AutoModelForSequenceClassification
-    _tf_auto_model = TFAutoModelForSequenceClassification
+    if is_torch_available():
+        _pt_auto_model = AutoModelForSequenceClassification
+    if is_tf_available():
+        _tf_auto_model = TFAutoModelForSequenceClassification
