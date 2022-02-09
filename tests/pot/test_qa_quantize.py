@@ -1,6 +1,7 @@
 import unittest
 import logging
 
+import torch
 from transformers import AutoTokenizer
 
 from optimum.intel.openvino import OVAutoModelForQuestionAnswering
@@ -43,6 +44,7 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
         self.assertEqual(answer, "the garden")
 
     def test_from_pt(self):
+        torch.sqrt = lambda x: torch.pow(x, 0.5)
         tok = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
             "bert-large-uncased-whole-word-masking-finetuned-squad", from_pt=True
