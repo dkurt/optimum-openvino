@@ -66,7 +66,6 @@ def load_ov_model_from_pytorch(model):
 
 def load_ov_model_from_tf(model, tf_weights_path):
     import subprocess
-    import sys
 
     import tensorflow as tf
     from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
@@ -86,8 +85,6 @@ def load_ov_model_from_tf(model, tf_weights_path):
 
     subprocess.run(
         [
-            sys.executable,
-            "-m",
             "mo",
             "--output_dir",
             cache_dir,
@@ -148,6 +145,7 @@ class OVPreTrainedModel(GenerationMixin):
         self.max_length = 0
         self.ov_config = {}
         self.ov_device = "CPU"
+        self.main_input_name = "input_ids"  # Fix for transformers>=4.16.0
         if is_torch_available():
             self.device = torch.device("cpu")
 
@@ -348,3 +346,6 @@ class OVPreTrainedModel(GenerationMixin):
         self.max_length -= 1
 
         return super().generate(input_ids, *args, **kwargs)
+
+    def forward(self, *args, **kwargs):
+        return self.__call__(*args, **kwargs)
