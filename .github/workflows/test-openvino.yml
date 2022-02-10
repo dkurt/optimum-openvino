@@ -42,4 +42,4 @@ jobs:
     - name: Test OpenVINO backend
       working-directory: tests/openvino
       run: |
-        python -m unittest
+        python -m unittest -v
