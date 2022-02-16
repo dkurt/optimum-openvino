@@ -116,7 +116,10 @@ def load_ov_model_from_tf(model, tf_weights_path):
     except Exception:
         pass
 
-    net = ie.read_model(tf_weights_path + ".xml")
+    if is_openvino_api_2:
+        net = ie.read_model(tf_weights_path + ".xml")
+    else:
+        net = ie.read_network(tf_weights_path + ".xml")
     return OVPreTrainedModel(net, model.config)
 
 
@@ -153,8 +156,12 @@ class OVPreTrainedModel(GenerationMixin):
     def __init__(self, net, config=None):
         super().__init__()
         self.net = net
-        self.input_names = [inp.get_any_name() for inp in self.net.inputs]
-        self.output_names = [out.get_any_name() for out in self.net.outputs]
+        if is_openvino_api_2:
+            self.input_names = [inp.get_any_name() for inp in self.net.inputs]
+            self.output_names = [out.get_any_name() for out in self.net.outputs]
+        else:
+            self.input_names = [inp for inp in self.net.inputs]
+            self.output_names = [out for out in self.net.outputs]
         self.exec_net = None
         self.config = config
         self.max_length = 0
@@ -286,14 +293,27 @@ class OVPreTrainedModel(GenerationMixin):
         else:
             self.exec_net = ie.load_network(self.net, self.ov_device, self.ov_config)
 
-    def _process_data(self, ids: np.ndarray, mask: np.ndarray, token_type_ids: np.ndarray):
-        inputs = {"input_ids": ids, "attention_mask": mask}
-        if token_type_ids is not None:
-            inputs["token_type_ids"] = token_type_ids
-
+    def _process_data_api_2021(self, inputs):
         # In case of batching, we process samples one by one instead of
         # single forward pass. It is done because of heavy load_network step.
-        batch_size = ids.shape[0]
+        batch_size = inputs["input_ids"].shape[0]
+        if batch_size > 1:
+            outs = {k: np.zeros([batch_size] + out.shape[1:], np.float32) for k, out in self.net.outputs.items()}
+            for i in range(batch_size):
+                outs_i = self.exec_net.infer({name: inp[i : i + 1] for name, inp in inputs.items()})
+                for name in outs:
+                    # OpenVINO produces redundant output for Stack layers. Ignore them
+                    if name.endswith("/stack"):
+                        continue
+                    outs[name][i] = outs_i[name]
+        else:
+            outs = self.exec_net.infer(inputs)
+        return outs
+
+    def _process_data_api_2022(self, inputs):
+        # In case of batching, we process samples one by one instead of
+        # single forward pass. It is done because of heavy load_network step.
+        batch_size = inputs["input_ids"].shape[0]
         if batch_size > 1:
             outs = {name: [] for name in self.output_names}
             for i in range(batch_size):
@@ -309,6 +329,16 @@ class OVPreTrainedModel(GenerationMixin):
             outs = self.exec_net.infer(inputs)
             outs = {out.get_any_name(): value for out, value in outs.items()}
         return outs
+
+    def _process_data(self, ids: np.ndarray, mask: np.ndarray, token_type_ids: np.ndarray):
+        inputs = {"input_ids": ids, "attention_mask": mask}
+        if token_type_ids is not None:
+            inputs["token_type_ids"] = token_type_ids
+
+        if is_openvino_api_2:
+            return self._process_data_api_2022(inputs)
+        else:
+            return self._process_data_api_2021(inputs)
 
     def __call__(
         self,
