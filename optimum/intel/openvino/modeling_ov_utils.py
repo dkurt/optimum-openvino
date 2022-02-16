@@ -85,6 +85,11 @@ def load_ov_model_from_tf(model, tf_weights_path):
         input_ids=tf.TensorSpec((None, None), tf.int32, name="input_ids"),
         attention_mask=tf.TensorSpec((None, None), tf.int32, name="attention_mask"),
     )
+    if isinstance(func.structured_outputs, tuple):
+        output_names = [out.name for out in func.structured_outputs]
+    else:
+        output_names = [out.name for out in func.structured_outputs.values()]
+
     frozen_func = convert_variables_to_constants_v2(func)
     graph_def = frozen_func.graph.as_graph_def()
 
@@ -104,6 +109,8 @@ def load_ov_model_from_tf(model, tf_weights_path):
             os.path.basename(tf_weights_path),
             "--input",
             "input_ids,attention_mask",
+            "--output",
+            ",".join(output_names),
             "--input_shape",
             "[1, 11], [1, 11]",
             "--disable_nhwc_to_nchw",
@@ -156,7 +163,12 @@ class OVPreTrainedModel(GenerationMixin):
     def __init__(self, net, config=None):
         super().__init__()
         self.net = net
+
         if is_openvino_api_2:
+            # Workaround for a bug with "input_ids:0" name
+            for inp in self.net.inputs:
+                name = inp.get_any_name().split(":")[0]
+                inp.get_tensor().set_names(set([name]))
             self.input_names = [inp.get_any_name() for inp in self.net.inputs]
             self.output_names = [out.get_any_name() for out in self.net.outputs]
         else:
@@ -296,7 +308,7 @@ class OVPreTrainedModel(GenerationMixin):
     def _process_data_api_2021(self, inputs):
         # In case of batching, we process samples one by one instead of
         # single forward pass. It is done because of heavy load_network step.
-        batch_size = inputs["input_ids"].shape[0]
+        batch_size = inputs[self.main_input_name].shape[0]
         if batch_size > 1:
             outs = {k: np.zeros([batch_size] + out.shape[1:], np.float32) for k, out in self.net.outputs.items()}
             for i in range(batch_size):
@@ -313,7 +325,7 @@ class OVPreTrainedModel(GenerationMixin):
     def _process_data_api_2022(self, inputs):
         # In case of batching, we process samples one by one instead of
         # single forward pass. It is done because of heavy load_network step.
-        batch_size = inputs["input_ids"].shape[0]
+        batch_size = inputs[self.main_input_name].shape[0]
         if batch_size > 1:
             outs = {name: [] for name in self.output_names}
             for i in range(batch_size):
