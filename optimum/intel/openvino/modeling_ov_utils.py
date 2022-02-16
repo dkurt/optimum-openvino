@@ -160,6 +160,7 @@ class OVPreTrainedModel(GenerationMixin):
         self.max_length = 0
         self.ov_config = {}
         self.ov_device = "CPU"
+        self.use_dynamic_shapes = is_openvino_api_2
         self.main_input_name = "input_ids"  # Fix for transformers>=4.16.0
         if is_torch_available():
             self.device = torch.device("cpu")
@@ -277,8 +278,9 @@ class OVPreTrainedModel(GenerationMixin):
 
     def _load_network(self):
         if is_openvino_api_2:
-            shape = PartialShape([1, -1])
-            self.net.reshape({name: shape for name in self.input_names})
+            if self.use_dynamic_shapes:
+                shape = PartialShape([1, -1])
+                self.net.reshape({name: shape for name in self.input_names})
             compiled_model = ie.compile_model(self.net, self.ov_device, self.ov_config)
             self.exec_net = compiled_model.create_infer_request()
         else:
@@ -343,6 +345,9 @@ class OVPreTrainedModel(GenerationMixin):
                 logger.info(f"Reshape model to 1x{input_ids.shape[1]}")
                 self.net.reshape(shapes)
                 self.exec_net = None
+        elif is_openvino_api_2 and not self.use_dynamic_shapes:
+            # TODO
+            pass
 
         if self.exec_net is None:
             self._load_network()
@@ -371,7 +376,7 @@ class OVPreTrainedModel(GenerationMixin):
             input_ids = torch.tensor(input_ids)
 
         # OpenVINO >= 2022.1 supports dynamic inputs so max_length is optional.
-        if not is_openvino_api_2:
+        if not self.use_dynamic_shapes:
             max_length = kwargs.get("max_length", None)
             self.max_length = max_length if max_length is not None else self.config.max_length
             self.max_length -= 1

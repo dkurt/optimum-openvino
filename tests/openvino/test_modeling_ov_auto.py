@@ -24,8 +24,10 @@ except ImportError:
         else:
             return test_case
 
+
 try:
     from openvino.runtime import Core
+
     Core()
     is_openvino_api_2 = True
 except ImportError:
@@ -275,6 +277,7 @@ class OVDistilBertModelIntegrationTest(unittest.TestCase):
         model = OVAutoModel.from_pretrained("distilbert-base-uncased", from_pt=True)
         model.to(device="CPU")
         model.set_config(config={"CPU_BIND_THREAD": "YES"})
+        model.use_dynamic_shapes = False  # TODO: Bug in 2022.1
 
         input_ids = np.array([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = np.array([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
