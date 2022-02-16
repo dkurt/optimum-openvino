@@ -6,7 +6,14 @@ import logging
 
 import numpy as np
 
-from openvino.inference_engine import IECore
+try:
+    from openvino.runtime import Core, PartialShape
+
+    is_openvino_api_2 = True
+except ImportError:
+    from openvino.inference_engine import IECore as Core
+
+    is_openvino_api_2 = False
 
 from transformers.file_utils import cached_path, hf_bucket_url
 from transformers.file_utils import is_torch_available
@@ -33,7 +40,7 @@ else:
 logger = logging.getLogger(__name__)
 
 OV_WEIGHTS_NAME = "ov_model.xml"
-ie = IECore()
+ie = Core()
 
 
 def load_ov_model_from_pytorch(model):
@@ -60,7 +67,10 @@ def load_ov_model_from_pytorch(model):
             model, inputs, buf, input_names=["input_ids", "attention_mask"], output_names=outputs, opset_version=11
         )
 
-    net = ie.read_network(buf.getvalue(), b"", init_from_buffer=True)
+    if is_openvino_api_2:
+        net = ie.read_model(buf.getvalue(), b"")
+    else:
+        net = ie.read_network(buf.getvalue(), b"", init_from_buffer=True)
     return OVPreTrainedModel(net, model.config)
 
 
@@ -106,7 +116,7 @@ def load_ov_model_from_tf(model, tf_weights_path):
     except Exception:
         pass
 
-    net = ie.read_network(tf_weights_path + ".xml")
+    net = ie.read_model(tf_weights_path + ".xml")
     return OVPreTrainedModel(net, model.config)
 
 
@@ -117,7 +127,10 @@ def load_ov_model_from_ir(xml_path, bin_path):
         shutil.copyfile(xml_path, xml_path + ".xml")
         xml_path += ".xml"
 
-    net = ie.read_network(xml_path, bin_path)
+    if is_openvino_api_2:
+        net = ie.read_model(xml_path, bin_path)
+    else:
+        net = ie.read_network(xml_path, bin_path)
     return OVPreTrainedModel(net)
 
 
@@ -140,6 +153,8 @@ class OVPreTrainedModel(GenerationMixin):
     def __init__(self, net, config=None):
         super().__init__()
         self.net = net
+        self.input_names = [inp.get_any_name() for inp in self.net.inputs]
+        self.output_names = [out.get_any_name() for out in self.net.outputs]
         self.exec_net = None
         self.config = config
         self.max_length = 0
@@ -261,28 +276,36 @@ class OVPreTrainedModel(GenerationMixin):
         self.ov_config = config
 
     def _load_network(self):
-        self.exec_net = ie.load_network(self.net, self.ov_device, self.ov_config)
+        if is_openvino_api_2:
+            shape = PartialShape([1, -1])
+            self.net.reshape({name: shape for name in self.input_names})
+            compiled_model = ie.compile_model(self.net, self.ov_device, self.ov_config)
+            self.exec_net = compiled_model.create_infer_request()
+        else:
+            self.exec_net = ie.load_network(self.net, self.ov_device, self.ov_config)
 
-    def _process_data(self, ids: np.ndarray, mask: np.ndarray):
+    def _process_data(self, ids: np.ndarray, mask: np.ndarray, token_type_ids: np.ndarray):
+        inputs = {"input_ids": ids, "attention_mask": mask}
+        if token_type_ids is not None:
+            inputs["token_type_ids"] = token_type_ids
+
         # In case of batching, we process samples one by one instead of
         # single forward pass. It is done because of heavy load_network step.
         batch_size = ids.shape[0]
         if batch_size > 1:
-            outs = {k: np.zeros([batch_size] + out.shape[1:], np.float32) for k, out in self.net.outputs.items()}
+            outs = {name: [] for name in self.output_names}
             for i in range(batch_size):
-                outs_i = self.exec_net.infer(
-                    {
-                        "input_ids": ids[i : i + 1],
-                        "attention_mask": mask[i : i + 1],
-                    }
-                )
-                for name in outs:
+                outs_i = self.exec_net.infer({name: inp[i : i + 1] for name, inp in inputs.items()})
+                for out, value in outs_i.items():
+                    name = out.get_any_name()
                     # OpenVINO produces redundant output for Stack layers. Ignore them
                     if name.endswith("/stack"):
                         continue
-                    outs[name][i] = outs_i[name]
+                    outs[name].append(value)
+            outs = {name: np.concatenate(tensors, axis=0) for name, tensors in outs.items()}
         else:
-            outs = self.exec_net.infer({"input_ids": ids, "attention_mask": mask})
+            outs = self.exec_net.infer(inputs)
+            outs = {out.get_any_name(): value for out, value in outs.items()}
         return outs
 
     def __call__(
@@ -299,6 +322,8 @@ class OVPreTrainedModel(GenerationMixin):
     ):
         if attention_mask is None:
             attention_mask = np.ones_like(input_ids)
+        if token_type_ids is None and "token_type_ids" in self.input_names:
+            token_type_ids = np.zeros_like(input_ids)
 
         batch_size, inp_length = input_ids.shape
         # If <max_length> specified, pad inputs by zeros
@@ -306,19 +331,23 @@ class OVPreTrainedModel(GenerationMixin):
             pad = ((0, 0), (0, self.max_length - inp_length))
             input_ids = np.pad(input_ids, pad)
             attention_mask = np.pad(attention_mask, pad)
+            if token_type_ids is not None:
+                token_type_ids = np.pad(token_type_ids, pad)
 
-        inputs_info = self.net.input_info
-        if inputs_info["input_ids"].input_data.shape[1] != input_ids.shape[1]:
-            # Use batch size 1 because we process batch sequently.
-            shapes = {key: [1, input_ids.shape[1]] for key in inputs_info}
-            logger.info(f"Reshape model to 1x{input_ids.shape[1]}")
-            self.net.reshape(shapes)
-            self.exec_net = None
+        # OpenVINO >= 2022.1 supports dynamic shapes input.
+        if not is_openvino_api_2:
+            inputs_info = self.net.input_info
+            if inputs_info["input_ids"].input_data.shape[1] != input_ids.shape[1]:
+                # Use batch size 1 because we process batch sequently.
+                shapes = {key: [1, input_ids.shape[1]] for key in inputs_info}
+                logger.info(f"Reshape model to 1x{input_ids.shape[1]}")
+                self.net.reshape(shapes)
+                self.exec_net = None
 
         if self.exec_net is None:
             self._load_network()
 
-        outs = self._process_data(input_ids, attention_mask)
+        outs = self._process_data(input_ids, attention_mask, token_type_ids)
 
         logits = outs["output"] if "output" in outs else next(iter(outs.values()))
 
@@ -341,9 +370,11 @@ class OVPreTrainedModel(GenerationMixin):
         if not isinstance(input_ids, torch.Tensor):
             input_ids = torch.tensor(input_ids)
 
-        max_length = kwargs.get("max_length", None)
-        self.max_length = max_length if max_length is not None else self.config.max_length
-        self.max_length -= 1
+        # OpenVINO >= 2022.1 supports dynamic inputs so max_length is optional.
+        if not is_openvino_api_2:
+            max_length = kwargs.get("max_length", None)
+            self.max_length = max_length if max_length is not None else self.config.max_length
+            self.max_length -= 1
 
         return super().generate(input_ids, *args, **kwargs)
 

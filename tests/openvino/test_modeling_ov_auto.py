@@ -24,6 +24,12 @@ except ImportError:
         else:
             return test_case
 
+try:
+    from openvino.runtime import Core
+    Core()
+    is_openvino_api_2 = True
+except ImportError:
+    is_openvino_api_2 = False
 
 from optimum.intel.openvino import (
     OVAutoModel,
@@ -67,14 +73,8 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
 
     @require_torch
     def test_from_pt(self):
-        try:
-            from openvino.runtime import Core
-
-            Core()
-
+        if is_openvino_api_2:
             return unittest.skip("Memory limit exceed")
-        except ImportError:
-            pass
 
         tok = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
