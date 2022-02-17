@@ -1,8 +1,11 @@
+diff --git a/examples/pytorch/audio-classification/run_audio_classification.py b/examples/pytorch/audio-classification/run_audio_classification.py
+index cfd2efe..bbd6177 100644
 --- a/examples/pytorch/audio-classification/run_audio_classification.py
 +++ b/examples/pytorch/audio-classification/run_audio_classification.py
 @@ -25,6 +25,8 @@ import datasets
  import numpy as np
  from datasets import DatasetDict, load_dataset
+
 +from optimum.intel.nncf import NNCFAutoConfig
 +
  import transformers
@@ -16,9 +19,11 @@
 +        return np.pad(wav, (0, sample_length - len(wav)))
      random_offset = randint(0, len(wav) - sample_length - 1)
      return wav[random_offset : random_offset + sample_length]
+
 @@ -321,6 +323,8 @@ def main():
          # Set the validation transforms
          raw_datasets["eval"].set_transform(val_transforms, output_all_columns=False)
+
 +    nncf_config = NNCFAutoConfig.from_json(training_args.nncf_config)
 +
      # Initialize our trainer
@@ -30,3 +35,5 @@
          tokenizer=feature_extractor,
 +        nncf_config=nncf_config,
      )
+
+     # Training
