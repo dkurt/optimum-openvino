@@ -47,6 +47,7 @@ jobs:
         wget https://raw.githubusercontent.com/huggingface/transformers/v4.15.0/examples/pytorch/audio-classification/requirements.txt
         patch -p1 < run_audio_classification.patch
         python -m pip install -r requirements.txt && rm requirements.txt
+        python -m pip install torch==1.9.1
 
     - name: Test NNCF
       working-directory: tests/nncf
