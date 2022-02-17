@@ -42,7 +42,7 @@ jobs:
         patch -p1 < run_ner.patch
         python -m pip install -r requirements.txt && rm requirements.txt
 
-        wget https://raw.githubusercontent.com/huggingface/transformers/v4.15.0/examples/pytorch/audio-classification/run_ner.py -P examples/pytorch/audio-classification
+        wget https://raw.githubusercontent.com/huggingface/transformers/v4.15.0/examples/pytorch/audio-classification/run_audio_classification.py -P examples/pytorch/audio-classification
         wget https://raw.githubusercontent.com/huggingface/transformers/v4.15.0/examples/pytorch/audio-classification/requirements.txt
         patch -p1 < run_audio_classification.patch
         python -m pip install -r requirements.txt && rm requirements.txt

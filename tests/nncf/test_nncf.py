@@ -13,7 +13,7 @@ import transformers
 
 
 class NNCFTests(unittest.TestCase):
-    def test_bert_base_nert(self):
+    def test_bert_base_ner(self):
         subprocess.run(
             [
                 sys.executable,
