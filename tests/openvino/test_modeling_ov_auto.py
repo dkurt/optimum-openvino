@@ -292,9 +292,7 @@ class OVDistilBertModelIntegrationTest(unittest.TestCase):
 
 
 class OVAutoModelForAudioClassificationTest(unittest.TestCase):
-    def test_audio_classification(self):
-        model = OVAutoModelForAudioClassification.from_pretrained("dkurt/wav2vec2-base-ft-keyword-spotting-int8")
-
+    def check_model(self, model):
         raw_datasets = DatasetDict()
         raw_datasets["eval"] = load_dataset("superb", "ks", split="validation")
         raw_datasets = raw_datasets.cast_column("audio", datasets.features.Audio(sampling_rate=16000))
@@ -303,3 +301,12 @@ class OVAutoModelForAudioClassificationTest(unittest.TestCase):
         out = model(sample["audio"]["array"].reshape(1, 16000))
 
         self.assertEqual(np.argmax(out.logits), 11)
+
+
+    def test_from_ir(self):
+        model = OVAutoModelForAudioClassification.from_pretrained("dkurt/wav2vec2-base-ft-keyword-spotting-int8")
+        self.check_model(model)
+
+    def test_from_pt(self):
+        model = OVAutoModelForAudioClassification.from_pretrained("anton-l/wav2vec2-base-ft-keyword-spotting", from_pt=True)
+        self.check_model(model)

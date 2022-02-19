@@ -10,13 +10,18 @@ if is_torch_available():
         AutoModelForQuestionAnswering,
         AutoModelForSequenceClassification,
         AutoModelWithLMHead,
-        AutoModelForAudioClassification,
     )
 
     try:
         from transformers import AutoModelForMaskedLM
     except ImportError:
         from transformers import AutoModelWithLMHead as AutoModelForMaskedLM
+
+    # Available since Transformers 4.12.0
+    try:
+        from transformers import AutoModelForAudioClassification
+    except ImportError:
+        pass
 
 if is_tf_available():
     from transformers import (
@@ -76,6 +81,7 @@ class OVAutoModelForSequenceClassification(_BaseOVAutoModelClass):
         _pt_auto_model = AutoModelForSequenceClassification
     if is_tf_available():
         _tf_auto_model = TFAutoModelForSequenceClassification
+
 
 class OVAutoModelForAudioClassification(_BaseOVAutoModelClass):
     if is_torch_available():
