@@ -55,6 +55,8 @@ def load_ov_model_from_pytorch(model):
             raise NotImplementedError("GPT2 model with use_cache=True is not implemented for OpenVINO backend")
 
         inputs = (dummy_input_ids, None, dummy_mask)
+    elif model.config.model_type == "wav2vec2":
+        inputs = torch.zeros((1, 16000), dtype=torch.float32)
     else:
         inputs = (dummy_input_ids, dummy_mask)
 
@@ -65,7 +67,7 @@ def load_ov_model_from_pytorch(model):
 
     with torch.no_grad():
         torch.onnx.export(
-            model, inputs, buf, input_names=["input_ids", "attention_mask"], output_names=outputs, opset_version=11
+            model, inputs, buf, input_names=[model.main_input_name], output_names=outputs, opset_version=11
         )
 
     if is_openvino_api_2:

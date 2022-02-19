@@ -87,8 +87,10 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
         )
         self.check_model(model, tok)
 
-    @unittest.skipIf(version.parse(transformers.__version__) < version.parse("4.0.0"),
-                     "Too old version of Transformers to test uploaded IR")
+    @unittest.skipIf(
+        version.parse(transformers.__version__) < version.parse("4.0.0"),
+        "Too old version of Transformers to test uploaded IR",
+    )
     def test_from_ir(self):
         tok = AutoTokenizer.from_pretrained("dkurt/bert-large-uncased-whole-word-masking-squad-int8-0001")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
@@ -298,8 +300,9 @@ class OVAutoModelForAudioClassificationTest(unittest.TestCase):
 
         self.assertEqual(np.argmax(out.logits), 11)
 
-    @unittest.skipIf(version.parse(transformers.__version__) < version.parse("4.12.0"),
-                     "Too old version for Audio models")
+    @unittest.skipIf(
+        version.parse(transformers.__version__) < version.parse("4.12.0"), "Too old version for Audio models"
+    )
     def test_from_ir(self):
         model = OVAutoModelForAudioClassification.from_pretrained("dkurt/wav2vec2-base-ft-keyword-spotting-int8")
         self.check_model(model)
@@ -308,4 +311,5 @@ class OVAutoModelForAudioClassificationTest(unittest.TestCase):
         model = OVAutoModelForAudioClassification.from_pretrained(
             "anton-l/wav2vec2-base-ft-keyword-spotting", from_pt=True
         )
+        model.use_dynamic_shapes = False
         self.check_model(model)

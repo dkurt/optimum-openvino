@@ -21,8 +21,10 @@ if is_torch_available():
     try:
         from transformers import AutoModelForAudioClassification
     except ImportError:
+
         class AutoModelForAudioClassification:
             pass
+
 
 if is_tf_available():
     from transformers import (
