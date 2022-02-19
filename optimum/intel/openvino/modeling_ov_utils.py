@@ -213,7 +213,9 @@ class OVPreTrainedModel(GenerationMixin):
             model = cls._pt_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)
             return load_ov_model_from_pytorch(model)
         elif from_tf:
-            model, cache_path = load_model_from_cache(model_name_or_path, cls.__name__, cache_dir, TF2_WEIGHTS_NAME, config)
+            model, cache_path = load_model_from_cache(
+                model_name_or_path, cls.__name__, cache_dir, TF2_WEIGHTS_NAME, config
+            )
             if model is not None:
                 return model
             model = cls._tf_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)
@@ -352,7 +354,6 @@ class OVPreTrainedModel(GenerationMixin):
             outs = {out.get_any_name(): value for out, value in outs.items()}
         return outs
 
-
     def _prepare_nlp_inputs(
         self,
         input_ids=None,
@@ -367,14 +368,13 @@ class OVPreTrainedModel(GenerationMixin):
     ):
         inputs = {
             "input_ids": input_ids,
-            "attention_mask": np.ones_like(input_ids) if attention_mask is None else attention_mask
+            "attention_mask": np.ones_like(input_ids) if attention_mask is None else attention_mask,
         }
 
         if "token_type_ids" in self.input_names:
             inputs["token_type_ids"] = np.zeros_like(input_ids) if token_type_ids is None else token_type_ids
 
         return inputs
-
 
     def _prepare_audio_inputs(
         self,
@@ -386,7 +386,6 @@ class OVPreTrainedModel(GenerationMixin):
         labels=None,
     ):
         return {"input_values": input_values}
-
 
     def _process_data(self, inputs, return_dict):
         inp_length = inputs[self.main_input_name].shape[1]
@@ -431,11 +430,9 @@ class OVPreTrainedModel(GenerationMixin):
         if arch.endswith("ForSequenceClassification"):
             return SequenceClassifierOutput(logits=logits)
         elif arch.endswith("ForQuestionAnswering"):
-            return QuestionAnsweringModelOutput(start_logits=outs["output_s"],
-                                                end_logits=outs["output_e"])
+            return QuestionAnsweringModelOutput(start_logits=outs["output_s"], end_logits=outs["output_e"])
         else:
             return ModelOutput(logits=torch.tensor(logits))
-
 
     def __call__(self, *args, **kwargs):
         if self.main_input_name == "input_ids":
@@ -445,11 +442,12 @@ class OVPreTrainedModel(GenerationMixin):
         else:
             raise Exception(f"Unexpected main_input_name: {self.main_input_name}")
 
-        return_dict = kwargs.get("return_dict", None)
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        if "return_dict" in kwargs:
+            return_dict = kwargs["return_dict"]
+        else:
+            return_dict = self.config.use_return_dict if hasattr(self.config, "use_return_dict") else None
 
         return self._process_data(inputs, return_dict)
-
 
     def generate(self, input_ids, *args, **kwargs):
         if not is_torch_available():

@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import unittest
+from packaging import version
 
 import numpy as np
 
+import transformers
 from transformers import AutoTokenizer
 import datasets
 from datasets import DatasetDict, load_dataset
@@ -77,23 +79,17 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
         self.assertEqual(answer, "the garden")
 
     @require_torch
+    @unittest.skipIf(is_openvino_api_2, "Memory limit exceed")
     def test_from_pt(self):
-        if is_openvino_api_2:
-            return unittest.skip("Memory limit exceed")
-
         tok = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
             "bert-large-uncased-whole-word-masking-finetuned-squad", from_pt=True
         )
         self.check_model(model, tok)
 
+    @unittest.skipIf(version.parse(transformers.__version__) < version.parse("4.0.0"),
+                     "Too old version of Transformers to test uploaded IR")
     def test_from_ir(self):
-        import transformers
-        from packaging import version
-
-        if version.parse(transformers.__version__) < version.parse("4.0.0"):
-            return unittest.skip("Too old version of Transformers to test uploaded IR")
-
         tok = AutoTokenizer.from_pretrained("dkurt/bert-large-uncased-whole-word-masking-squad-int8-0001")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
             "dkurt/bert-large-uncased-whole-word-masking-squad-int8-0001"
@@ -302,11 +298,14 @@ class OVAutoModelForAudioClassificationTest(unittest.TestCase):
 
         self.assertEqual(np.argmax(out.logits), 11)
 
-
+    @unittest.skipIf(version.parse(transformers.__version__) < version.parse("4.12.0"),
+                     "Too old version for Audio models")
     def test_from_ir(self):
         model = OVAutoModelForAudioClassification.from_pretrained("dkurt/wav2vec2-base-ft-keyword-spotting-int8")
         self.check_model(model)
 
     def test_from_pt(self):
-        model = OVAutoModelForAudioClassification.from_pretrained("anton-l/wav2vec2-base-ft-keyword-spotting", from_pt=True)
+        model = OVAutoModelForAudioClassification.from_pretrained(
+            "anton-l/wav2vec2-base-ft-keyword-spotting", from_pt=True
+        )
         self.check_model(model)
