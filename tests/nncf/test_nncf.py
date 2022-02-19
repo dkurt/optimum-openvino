@@ -46,8 +46,10 @@ class NNCFTests(unittest.TestCase):
         output = model(input_ids, attention_mask=attention_mask)[0]
         self.assertEqual(output.shape, expected_shape)
 
-    @unittest.skipIf(version.parse(transformers.__version__) < version.parse("4.15.0"),
-                     "Test is supported starts from Transformers 4.15.0")
+    @unittest.skipIf(
+        version.parse(transformers.__version__) < version.parse("4.15.0"),
+        "Test is supported starts from Transformers 4.15.0",
+    )
     def test_wav2vec2_audio_classification(self):
         subprocess.run(
             [

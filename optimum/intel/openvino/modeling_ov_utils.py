@@ -67,7 +67,12 @@ def load_ov_model_from_pytorch(model):
 
     with torch.no_grad():
         torch.onnx.export(
-            model, inputs, buf, input_names=[model.main_input_name], output_names=outputs, opset_version=11
+            model,
+            inputs,
+            buf,
+            input_names=[model.main_input_name, "attention_mask"],
+            output_names=outputs,
+            opset_version=11,
         )
 
     if is_openvino_api_2:
@@ -401,6 +406,7 @@ class OVPreTrainedModel(GenerationMixin):
         # OpenVINO >= 2022.1 supports dynamic shapes input.
         if not is_openvino_api_2:
             inputs_info = self.net.input_info
+            input_ids = inputs[self.main_input_name]
             if inputs_info[self.main_input_name].input_data.shape[1] != input_ids.shape[1]:
                 # Use batch size 1 because we process batch sequently.
                 shapes = {key: [1, input_ids.shape[1]] for key in inputs_info}

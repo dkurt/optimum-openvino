@@ -1,6 +1,7 @@
 # Copyright (C) 2018-2021 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 import unittest
 from packaging import version
 
@@ -79,7 +80,7 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
         self.assertEqual(answer, "the garden")
 
     @require_torch
-    @unittest.skipIf(is_openvino_api_2, "Memory limit exceed")
+    @unittest.skipIf(is_openvino_api_2 and "GITHUB_ACTIONS" in os.environ, "Memory limit exceed")
     def test_from_pt(self):
         tok = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
@@ -289,6 +290,9 @@ class OVDistilBertModelIntegrationTest(unittest.TestCase):
         self.assertTrue(np.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
+@unittest.skipIf(
+    version.parse(transformers.__version__) < version.parse("4.12.0"), "Too old version for Audio models"
+)
 class OVAutoModelForAudioClassificationTest(unittest.TestCase):
     def check_model(self, model):
         raw_datasets = DatasetDict()
@@ -300,13 +304,11 @@ class OVAutoModelForAudioClassificationTest(unittest.TestCase):
 
         self.assertEqual(np.argmax(out.logits), 11)
 
-    @unittest.skipIf(
-        version.parse(transformers.__version__) < version.parse("4.12.0"), "Too old version for Audio models"
-    )
     def test_from_ir(self):
         model = OVAutoModelForAudioClassification.from_pretrained("dkurt/wav2vec2-base-ft-keyword-spotting-int8")
         self.check_model(model)
 
+    @require_torch
     def test_from_pt(self):
         model = OVAutoModelForAudioClassification.from_pretrained(
             "anton-l/wav2vec2-base-ft-keyword-spotting", from_pt=True
