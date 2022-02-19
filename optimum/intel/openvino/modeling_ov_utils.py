@@ -19,6 +19,7 @@ from transformers.file_utils import cached_path, hf_bucket_url
 from transformers.file_utils import is_torch_available
 from transformers import (
     TF2_WEIGHTS_NAME,
+    AutoConfig,
 )
 
 
@@ -26,7 +27,7 @@ if is_torch_available():
     import torch
     from transformers.generation_utils import GenerationMixin
     from transformers.file_utils import ModelOutput
-    from transformers.modeling_outputs import QuestionAnsweringModelOutput
+    from transformers.modeling_outputs import QuestionAnsweringModelOutput, SequenceClassifierOutput
 else:
     from collections import namedtuple
 
@@ -130,7 +131,7 @@ def load_ov_model_from_tf(model, tf_weights_path):
     return OVPreTrainedModel(net, model.config)
 
 
-def load_ov_model_from_ir(xml_path, bin_path):
+def load_ov_model_from_ir(xml_path, bin_path, config):
     if not xml_path.endswith(".xml"):
         import shutil
 
@@ -141,10 +142,10 @@ def load_ov_model_from_ir(xml_path, bin_path):
         net = ie.read_model(xml_path, bin_path)
     else:
         net = ie.read_network(xml_path, bin_path)
-    return OVPreTrainedModel(net)
+    return OVPreTrainedModel(net, config)
 
 
-def load_model_from_cache(model_name_or_path, model_arch, cache_dir, filename):
+def load_model_from_cache(model_name_or_path, model_arch, cache_dir, filename, config):
     url = hf_bucket_url(model_name_or_path, filename=filename)
     path = cached_path(url, cache_dir=cache_dir) + "." + model_arch
     xml_path = path + ".xml"
@@ -152,7 +153,7 @@ def load_model_from_cache(model_name_or_path, model_arch, cache_dir, filename):
     model = None
     if os.path.exists(xml_path) and os.path.exists(bin_path):
         logger.info(f"Load OpenVINO model from cache: {xml_path}")
-        model = load_ov_model_from_ir(xml_path, bin_path)
+        model = load_ov_model_from_ir(xml_path, bin_path, config)
     return model, path
 
 
@@ -160,7 +161,7 @@ class OVPreTrainedModel(GenerationMixin):
     _pt_auto_model = None
     _tf_auto_model = None
 
-    def __init__(self, net, config=None):
+    def __init__(self, net, config):
         super().__init__()
         self.net = net
 
@@ -180,7 +181,14 @@ class OVPreTrainedModel(GenerationMixin):
         self.ov_config = {}
         self.ov_device = "CPU"
         self.use_dynamic_shapes = is_openvino_api_2
-        self.main_input_name = "input_ids"  # Fix for transformers>=4.16.0
+
+        self.main_input_name = None
+        for name in ["input_ids", "input_values"]:
+            if name in self.input_names:
+                self.main_input_name = name
+        if self.main_input_name is None:
+            raise Exception(f"Cannot determine main_input_name from {self.input_names}")
+
         if is_torch_available():
             self.device = torch.device("cpu")
 
@@ -199,11 +207,13 @@ class OVPreTrainedModel(GenerationMixin):
         from_pipeline = kwargs.pop("_from_pipeline", None)
         from_auto_class = kwargs.pop("_from_auto", False)
 
+        config = AutoConfig.from_pretrained(model_name_or_path)
+
         if from_pt:
             model = cls._pt_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)
             return load_ov_model_from_pytorch(model)
         elif from_tf:
-            model, cache_path = load_model_from_cache(model_name_or_path, cls.__name__, cache_dir, TF2_WEIGHTS_NAME)
+            model, cache_path = load_model_from_cache(model_name_or_path, cls.__name__, cache_dir, TF2_WEIGHTS_NAME, config)
             if model is not None:
                 return model
             model = cls._tf_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)
@@ -275,7 +285,7 @@ class OVPreTrainedModel(GenerationMixin):
         else:
             resolved_archive_files = None
 
-        return load_ov_model_from_ir(*resolved_archive_files)
+        return load_ov_model_from_ir(*resolved_archive_files, config=config)
 
     def save_pretrained(
         self,
@@ -342,17 +352,8 @@ class OVPreTrainedModel(GenerationMixin):
             outs = {out.get_any_name(): value for out, value in outs.items()}
         return outs
 
-    def _process_data(self, ids: np.ndarray, mask: np.ndarray, token_type_ids: np.ndarray):
-        inputs = {"input_ids": ids, "attention_mask": mask}
-        if token_type_ids is not None:
-            inputs["token_type_ids"] = token_type_ids
 
-        if is_openvino_api_2:
-            return self._process_data_api_2022(inputs)
-        else:
-            return self._process_data_api_2021(inputs)
-
-    def __call__(
+    def _prepare_nlp_inputs(
         self,
         input_ids=None,
         past_key_values=None,
@@ -364,24 +365,42 @@ class OVPreTrainedModel(GenerationMixin):
         output_attentions=False,
         output_hidden_states=False,
     ):
-        if attention_mask is None:
-            attention_mask = np.ones_like(input_ids)
-        if token_type_ids is None and "token_type_ids" in self.input_names:
-            token_type_ids = np.zeros_like(input_ids)
+        inputs = {
+            "input_ids": input_ids,
+            "attention_mask": np.ones_like(input_ids) if attention_mask is None else attention_mask
+        }
 
-        batch_size, inp_length = input_ids.shape
+        if "token_type_ids" in self.input_names:
+            inputs["token_type_ids"] = np.zeros_like(input_ids) if token_type_ids is None else token_type_ids
+
+        return inputs
+
+
+    def _prepare_audio_inputs(
+        self,
+        input_values,
+        attention_mask=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        labels=None,
+    ):
+        return {"input_values": input_values}
+
+
+    def _process_data(self, inputs, return_dict):
+        inp_length = inputs[self.main_input_name].shape[1]
+
         # If <max_length> specified, pad inputs by zeros
         if inp_length < self.max_length:
             pad = ((0, 0), (0, self.max_length - inp_length))
-            input_ids = np.pad(input_ids, pad)
-            attention_mask = np.pad(attention_mask, pad)
-            if token_type_ids is not None:
-                token_type_ids = np.pad(token_type_ids, pad)
+            for name in inputs:
+                inputs[name] = np.pad(inputs[name], pad)
 
         # OpenVINO >= 2022.1 supports dynamic shapes input.
         if not is_openvino_api_2:
             inputs_info = self.net.input_info
-            if inputs_info["input_ids"].input_data.shape[1] != input_ids.shape[1]:
+            if inputs_info[self.main_input_name].input_data.shape[1] != input_ids.shape[1]:
                 # Use batch size 1 because we process batch sequently.
                 shapes = {key: [1, input_ids.shape[1]] for key in inputs_info}
                 logger.info(f"Reshape model to 1x{input_ids.shape[1]}")
@@ -394,7 +413,10 @@ class OVPreTrainedModel(GenerationMixin):
         if self.exec_net is None:
             self._load_network()
 
-        outs = self._process_data(input_ids, attention_mask, token_type_ids)
+        if is_openvino_api_2:
+            outs = self._process_data_api_2022(inputs)
+        else:
+            outs = self._process_data_api_2021(inputs)
 
         logits = outs["output"] if "output" in outs else next(iter(outs.values()))
 
@@ -402,13 +424,32 @@ class OVPreTrainedModel(GenerationMixin):
         if inp_length != logits.shape[1]:
             logits = logits[:, :inp_length]
 
-        if return_dict:
-            result = ModelOutput(logits=torch.tensor(logits))
-        elif "output_s" in outs and "output_e" in outs:
-            result = QuestionAnsweringModelOutput(start_logits=outs["output_s"], end_logits=outs["output_e"])
+        if not return_dict:
+            return [logits]
+
+        arch = self.config.architectures[0]
+        if arch.endswith("ForSequenceClassification"):
+            return SequenceClassifierOutput(logits=logits)
+        elif arch.endswith("ForQuestionAnswering"):
+            return QuestionAnsweringModelOutput(start_logits=outs["output_s"],
+                                                end_logits=outs["output_e"])
         else:
-            result = [logits]
-        return result
+            return ModelOutput(logits=torch.tensor(logits))
+
+
+    def __call__(self, *args, **kwargs):
+        if self.main_input_name == "input_ids":
+            inputs = self._prepare_nlp_inputs(*args, **kwargs)
+        elif self.main_input_name == "input_values":
+            inputs = self._prepare_audio_inputs(*args, **kwargs)
+        else:
+            raise Exception(f"Unexpected main_input_name: {self.main_input_name}")
+
+        return_dict = kwargs.get("return_dict", None)
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        return self._process_data(inputs, return_dict)
+
 
     def generate(self, input_ids, *args, **kwargs):
         if not is_torch_available():

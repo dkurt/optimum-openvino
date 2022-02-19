@@ -6,6 +6,8 @@ import unittest
 import numpy as np
 
 from transformers import AutoTokenizer
+import datasets
+from datasets import DatasetDict, load_dataset
 
 try:
     from transformers.testing_utils import require_tf, require_torch
@@ -38,6 +40,7 @@ from optimum.intel.openvino import (
     OVAutoModelForMaskedLM,
     OVAutoModelForQuestionAnswering,
     OVAutoModelWithLMHead,
+    OVAutoModelForAudioClassification,
 )
 
 
@@ -286,3 +289,17 @@ class OVDistilBertModelIntegrationTest(unittest.TestCase):
         expected_slice = np.array([[[-0.1639, 0.3299, 0.1648], [-0.1746, 0.3289, 0.1710], [-0.1884, 0.3357, 0.1810]]])
 
         self.assertTrue(np.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+
+class OVAutoModelForAudioClassificationTest(unittest.TestCase):
+    def test_audio_classification(self):
+        model = OVAutoModelForAudioClassification.from_pretrained("dkurt/wav2vec2-base-ft-keyword-spotting-int8")
+
+        raw_datasets = DatasetDict()
+        raw_datasets["eval"] = load_dataset("superb", "ks", split="validation")
+        raw_datasets = raw_datasets.cast_column("audio", datasets.features.Audio(sampling_rate=16000))
+
+        sample = raw_datasets["eval"][0]
+        out = model(sample["audio"]["array"].reshape(1, 16000))
+
+        self.assertEqual(np.argmax(out.logits), 11)

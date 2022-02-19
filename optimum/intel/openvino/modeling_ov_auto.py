@@ -10,6 +10,7 @@ if is_torch_available():
         AutoModelForQuestionAnswering,
         AutoModelForSequenceClassification,
         AutoModelWithLMHead,
+        AutoModelForAudioClassification,
     )
 
     try:
@@ -75,3 +76,7 @@ class OVAutoModelForSequenceClassification(_BaseOVAutoModelClass):
         _pt_auto_model = AutoModelForSequenceClassification
     if is_tf_available():
         _tf_auto_model = TFAutoModelForSequenceClassification
+
+class OVAutoModelForAudioClassification(_BaseOVAutoModelClass):
+    if is_torch_available():
+        _pt_auto_model = AutoModelForAudioClassification
