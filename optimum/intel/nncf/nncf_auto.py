@@ -110,8 +110,13 @@ def get_data_loader_cls(args, train_dataset):
                 }
 
         return ConllInitializingDataloader
+    else:
 
-    raise Exception(f"Unexpected dataset_name: {dataset_name} and task_name: {task_name} combination")
+        class DefaultDataLoader(PTInitializingDataLoader):
+            def get_inputs(self, dataloader_output):
+                return (), dataloader_output
+
+        return DefaultDataLoader
 
 
 class NNCFAutoConfig(NNCFConfig):

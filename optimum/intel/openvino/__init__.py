@@ -7,6 +7,7 @@ from .modeling_ov_auto import (
     OVAutoModelWithLMHead,
     OVAutoModelForQuestionAnswering,
     OVAutoModelForSequenceClassification,
+    OVAutoModelForAudioClassification,
 )
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "OVAutoModelWithLMHead",
     "OVAutoModelForQuestionAnswering",
     "OVAutoModelForSequenceClassification",
+    "OVAutoModelForAudioClassification",
 ]

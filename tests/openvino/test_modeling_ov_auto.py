@@ -1,11 +1,16 @@
 # Copyright (C) 2018-2021 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 import unittest
+from packaging import version
 
 import numpy as np
 
+import transformers
 from transformers import AutoTokenizer
+import datasets
+from datasets import DatasetDict, load_dataset
 
 try:
     from transformers.testing_utils import require_tf, require_torch
@@ -38,6 +43,7 @@ from optimum.intel.openvino import (
     OVAutoModelForMaskedLM,
     OVAutoModelForQuestionAnswering,
     OVAutoModelWithLMHead,
+    OVAutoModelForAudioClassification,
 )
 
 
@@ -74,23 +80,19 @@ class OVBertForQuestionAnsweringTest(unittest.TestCase):
         self.assertEqual(answer, "the garden")
 
     @require_torch
+    @unittest.skipIf(is_openvino_api_2 and "GITHUB_ACTIONS" in os.environ, "Memory limit exceed")
     def test_from_pt(self):
-        if is_openvino_api_2:
-            return unittest.skip("Memory limit exceed")
-
         tok = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
             "bert-large-uncased-whole-word-masking-finetuned-squad", from_pt=True
         )
         self.check_model(model, tok)
 
+    @unittest.skipIf(
+        version.parse(transformers.__version__) < version.parse("4.0.0"),
+        "Too old version of Transformers to test uploaded IR",
+    )
     def test_from_ir(self):
-        import transformers
-        from packaging import version
-
-        if version.parse(transformers.__version__) < version.parse("4.0.0"):
-            return unittest.skip("Too old version of Transformers to test uploaded IR")
-
         tok = AutoTokenizer.from_pretrained("dkurt/bert-large-uncased-whole-word-masking-squad-int8-0001")
         model = OVAutoModelForQuestionAnswering.from_pretrained(
             "dkurt/bert-large-uncased-whole-word-masking-squad-int8-0001"
@@ -286,3 +288,28 @@ class OVDistilBertModelIntegrationTest(unittest.TestCase):
         expected_slice = np.array([[[-0.1639, 0.3299, 0.1648], [-0.1746, 0.3289, 0.1710], [-0.1884, 0.3357, 0.1810]]])
 
         self.assertTrue(np.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+
+@unittest.skipIf(version.parse(transformers.__version__) < version.parse("4.12.0"), "Too old version for Audio models")
+class OVAutoModelForAudioClassificationTest(unittest.TestCase):
+    def check_model(self, model):
+        raw_datasets = DatasetDict()
+        raw_datasets["eval"] = load_dataset("superb", "ks", split="validation")
+        raw_datasets = raw_datasets.cast_column("audio", datasets.features.Audio(sampling_rate=16000))
+
+        sample = raw_datasets["eval"][0]
+        out = model(sample["audio"]["array"].reshape(1, 16000))
+
+        self.assertEqual(np.argmax(out.logits), 11)
+
+    def test_from_ir(self):
+        model = OVAutoModelForAudioClassification.from_pretrained("dkurt/wav2vec2-base-ft-keyword-spotting-int8")
+        self.check_model(model)
+
+    @require_torch
+    def test_from_pt(self):
+        model = OVAutoModelForAudioClassification.from_pretrained(
+            "anton-l/wav2vec2-base-ft-keyword-spotting", from_pt=True
+        )
+        model.use_dynamic_shapes = False
+        self.check_model(model)

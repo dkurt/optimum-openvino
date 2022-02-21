@@ -195,7 +195,7 @@ index d6e0d51..0ede165 100644
              else:
                  logger.info("Trainer.model is not a `PreTrainedModel`, only saving its state dict.")
                  if state_dict is None:
-@@ -1937,6 +1961,16 @@ class Trainer:
+@@ -1937,6 +1961,15 @@ class Trainer:
          # Good practice: save your training arguments together with the trained model
          torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
 
@@ -207,7 +207,6 @@ index d6e0d51..0ede165 100644
 +        subprocess.run(
 +            [sys.executable, "-m", "mo", "--input_model", path_to_onnx, "--output_dir", output_dir], check=True
 +        )
-+        os.remove(path_to_onnx)
 +
      def store_flos(self):
          # Storing the number of floating-point operations that went into the model
