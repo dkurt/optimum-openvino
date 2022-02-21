@@ -290,9 +290,7 @@ class OVDistilBertModelIntegrationTest(unittest.TestCase):
         self.assertTrue(np.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
-@unittest.skipIf(
-    version.parse(transformers.__version__) < version.parse("4.12.0"), "Too old version for Audio models"
-)
+@unittest.skipIf(version.parse(transformers.__version__) < version.parse("4.12.0"), "Too old version for Audio models")
 class OVAutoModelForAudioClassificationTest(unittest.TestCase):
     def check_model(self, model):
         raw_datasets = DatasetDict()

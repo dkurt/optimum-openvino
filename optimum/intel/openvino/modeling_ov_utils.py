@@ -214,7 +214,7 @@ class OVPreTrainedModel(GenerationMixin):
         from_pipeline = kwargs.pop("_from_pipeline", None)
         from_auto_class = kwargs.pop("_from_auto", False)
 
-        config = AutoConfig.from_pretrained(model_name_or_path)
+        config = kwargs.pop("config") if "config" in kwargs else AutoConfig.from_pretrained(model_name_or_path)
 
         if from_pt:
             model = cls._pt_auto_model.from_pretrained(model_name_or_path, *model_args, **kwargs)

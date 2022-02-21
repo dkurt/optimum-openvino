@@ -10,6 +10,7 @@ from optimum.intel.openvino import (
     OVAutoModel,
 )
 import transformers
+from transformers import AutoConfig
 
 
 class NNCFTests(unittest.TestCase):
@@ -38,7 +39,8 @@ class NNCFTests(unittest.TestCase):
             self.assertGreaterEqual(logs["eval_precision"], 0.66)
             self.assertGreaterEqual(logs["eval_recall"], 0.66)
 
-        model = OVAutoModel.from_pretrained("bert_base_cased_conll_int8")
+        config = AutoConfig.from_pretrained("bert-base-cased")
+        model = OVAutoModel.from_pretrained("bert_base_cased_conll_int8", config=config)
         input_ids = np.random.randint(0, 256, [1, 128])
         attention_mask = np.random.randint(0, 2, [1, 128])
 
