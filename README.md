@@ -1,3 +1,5 @@
+:warning: This project is transfered under OpenVINO organization into https://github.com/openvinotoolkit/openvino_contrib. Please consider using `pip install openvino-optimum` to get the latest and greatest package. Thanks for using and starring the project!
+
 # Optimum OpenVINO
 
 [![OpenVINO Runtime](https://github.com/dkurt/optimum-openvino/actions/workflows/test-openvino.yml/badge.svg?branch=main)](https://github.com/dkurt/optimum-openvino/actions/workflows/test-openvino.yml) [![NNCF](https://github.com/dkurt/optimum-openvino/actions/workflows/test-nncf.yml/badge.svg?branch=main)](https://github.com/dkurt/optimum-openvino/actions/workflows/test-nncf.yml)
