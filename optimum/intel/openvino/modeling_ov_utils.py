@@ -7,7 +7,7 @@ import logging
 import numpy as np
 
 try:
-    from openvino.runtime import Core, PartialShape
+    from openvino.runtime import Core, PartialShape, AsyncInferQueue
 
     is_openvino_api_2 = True
 except ImportError:
@@ -319,8 +319,13 @@ class OVPreTrainedModel(GenerationMixin):
             if self.use_dynamic_shapes:
                 shape = PartialShape([1, -1])
                 self.net.reshape({name: shape for name in self.input_names})
+
+            if "CPU" in self.ov_device:
+                ie.set_property("CPU", {"CPU_THROUGHPUT_STREAMS": "CPU_THROUGHPUT_AUTO", "CPU_BIND_THREAD": "YES"})
+
             compiled_model = ie.compile_model(self.net, self.ov_device, self.ov_config)
-            self.exec_net = compiled_model.create_infer_request()
+            num_requests = compiled_model.get_metric("OPTIMAL_NUMBER_OF_INFER_REQUESTS")
+            self.exec_net = AsyncInferQueue(compiled_model, num_requests)
         else:
             self.exec_net = ie.load_network(self.net, self.ov_device, self.ov_config)
 
@@ -347,14 +352,21 @@ class OVPreTrainedModel(GenerationMixin):
         batch_size = inputs[self.main_input_name].shape[0]
         if batch_size > 1:
             outs = {name: [] for name in self.output_names}
-            for i in range(batch_size):
-                outs_i = self.exec_net.infer({name: inp[i : i + 1] for name, inp in inputs.items()})
+
+            def completion_callback(request, batch_id):
+                outs_i = request.results
                 for out, value in outs_i.items():
                     name = out.get_any_name()
                     # OpenVINO produces redundant output for Stack layers. Ignore them
                     if name.endswith("/stack"):
                         continue
                     outs[name].append(value)
+
+            self.exec_net.set_callback(completion_callback)
+            for i in range(batch_size):
+                self.exec_net.start_async({name: inp[i : i + 1] for name, inp in inputs.items()}, i)
+            self.exec_net.wait_all()
+
             outs = {name: np.concatenate(tensors, axis=0) for name, tensors in outs.items()}
         else:
             outs = self.exec_net.infer(inputs)
